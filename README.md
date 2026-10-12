@@ -29,6 +29,8 @@
 
 **[🛡 Проверка RelixChat 2.9.2 в VirusTotal](https://www.virustotal.com/gui/file/c08b2c6e400d05d11b186090a205c83e3b96c2d726fe7e850db9488db4c80cd1)**
 
+Результат: 0 срабатываний из 67 антивирусов.
+
 SHA-256 файла `RelixChat.apk` (2.9.2):
 `c08b2c6e400d05d11b186090a205c83e3b96c2d726fe7e850db9488db4c80cd1`
 
