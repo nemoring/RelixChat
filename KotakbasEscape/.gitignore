@@ -1,0 +1,11 @@
+# Godot
+.godot/
+*.translation
+export_credentials.cfg
+# Сборки и ключи (никогда не коммитить ключи и пароли)
+build/
+*.keystore
+*.jks
+*.apk
+*.aab
+*.idsig
