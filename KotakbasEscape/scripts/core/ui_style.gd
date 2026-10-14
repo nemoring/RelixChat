@@ -12,10 +12,18 @@ const BAD := Color(1.0, 0.35, 0.3)
 
 const FONT_BODY_PATH := "res://assets/fonts/Rubik.ttf"
 const FONT_TITLE_PATH := "res://assets/fonts/RussoOne-Regular.ttf"
+const FONT_FALLBACK_PATH := "res://assets/fonts/DejaVuSans-Bold.ttf"
 
 static var _body: Font
 static var _bold: Font
 static var _title: Font
+static var _fallback: Font
+
+## Запасной шрифт для стрелок и символов (■ → ★), которых нет в основных шрифтах.
+static func fallback_font() -> Font:
+	if _fallback == null:
+		_fallback = load(FONT_FALLBACK_PATH)
+	return _fallback
 
 static func body_font() -> Font:
 	if _body == null:
@@ -23,6 +31,7 @@ static func body_font() -> Font:
 		var fv := FontVariation.new()
 		fv.base_font = base
 		fv.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 500}
+		fv.fallbacks = [fallback_font()]
 		_body = fv
 	return _body
 
@@ -32,12 +41,16 @@ static func bold_font() -> Font:
 		var fv := FontVariation.new()
 		fv.base_font = base
 		fv.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 700}
+		fv.fallbacks = [fallback_font()]
 		_bold = fv
 	return _bold
 
 static func title_font() -> Font:
 	if _title == null:
-		_title = load(FONT_TITLE_PATH)
+		var fv := FontVariation.new()
+		fv.base_font = load(FONT_TITLE_PATH)
+		fv.fallbacks = [fallback_font()]
+		_title = fv
 	return _title
 
 static func panel_style(color: Color = BG, radius := 18, border: Color = Color(0, 0, 0, 0), border_w := 3) -> StyleBoxFlat:
