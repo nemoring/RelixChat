@@ -1346,3 +1346,22 @@ func debug_third_person() -> void:
 	player.set_third_person(true)
 	player.pitch = -0.35
 	player.look(Vector2.ZERO)
+
+func debug_ui(which: String) -> void:
+	if not GameManager.debug_enabled:
+		return
+	inventory.add("wood", 25)
+	inventory.add("stone", 12)
+	inventory.add("berries", 4)
+	inventory.add("map", 1)
+	inventory.add("fabric", 3)
+	match which:
+		"inv": _open_inventory(null)
+		"craft": open_crafting("")
+		"build": _open_build_menu()
+		"map": _open_overlay(_make_map())
+
+func debug_inv() -> void: debug_ui("inv")
+func debug_craft() -> void: debug_ui("craft")
+func debug_build() -> void: debug_ui("build")
+func debug_map() -> void: debug_ui("map")

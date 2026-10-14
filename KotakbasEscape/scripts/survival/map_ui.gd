@@ -51,7 +51,8 @@ func _ready() -> void:
 		var l2 := UIStyle.make_label("%d. %s%s" % [i + 1, prefix, q.title if i <= qm.index else "???"], 22, col)
 		list.add_child(l2)
 		if cur:
-			var d := UIStyle.make_label(q.desc + "\n" + qm.progress_text(), 18, Color.WHITE)
+			var prog := qm.progress_text()
+			var d := UIStyle.make_label(q.desc + ("" if prog == q.desc else "\n" + prog), 18, Color.WHITE)
 			d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			list.add_child(d)
 	var info := UIStyle.make_label("Налётов НЛО отбито/пережито: %d" % game.ufo_manager.raid_count, 18, UIStyle.MUTED)
