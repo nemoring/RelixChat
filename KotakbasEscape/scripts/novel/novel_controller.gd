@@ -241,7 +241,12 @@ func _exec(cmds: Array, sid: String) -> String:
 	for i in cmds.size():
 		var c: Dictionary = cmds[i]
 		var line_id := "%s:%d:%d" % [sid, i, cmds.size()]
-		if c.has("s"):
+		if c.has("item"):
+			GameManager.add_carry_item(c.item, int(c.get("n", 1)))
+			if int(c.get("n", 1)) > 0:
+				AudioManager.play_sfx("pickup")
+			_update_hud()
+		elif c.has("s"):
 			await dialogue.say(c.s, c.get("e", "normal"), c.t, line_id)
 		elif c.has("n"):
 			await dialogue.say("narrator", "normal", c.n, line_id)
@@ -282,11 +287,6 @@ func _exec(cmds: Array, sid: String) -> String:
 				flags[k] = maxi(0, int(flags.get(k, 0)) + int(v))
 				if k == "suspicion" and v != 0:
 					GameManager.toast("Подозрение %s" % ("растёт!" if v > 0 else "снижается"), UIStyle.BAD if v > 0 else UIStyle.GOOD, 1.6)
-			_update_hud()
-		elif c.has("item"):
-			GameManager.add_carry_item(c.item, int(c.get("n", 1)))
-			if int(c.get("n", 1)) > 0:
-				AudioManager.play_sfx("pickup")
 			_update_hud()
 		elif c.has("if"):
 			var branch: Array = c.get("do", []) if _cond(c["if"]) else c.get("else", [])
