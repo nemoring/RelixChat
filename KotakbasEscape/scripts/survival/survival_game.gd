@@ -119,6 +119,12 @@ func _ready() -> void:
 	GameManager.app_paused.connect(_on_app_paused)
 	_update_music(true)
 	weather._apply_sound()
+	quests.quest_completed.connect(_on_quest_completed)
+	# Сохранение, сделанное между финальным налётом и концовкой: показываем финал один раз.
+	if not fresh and quests.current().get("id", "") == "finish" and not story_completed():
+		get_tree().create_timer(2.0).timeout.connect(_ending_sequence)
+	elif story_completed():
+		get_tree().create_timer(2.0).timeout.connect(func(): subtitle("Сюжет пройден. Свободная игра: лес, стройка и НЛО ТЦК никуда не делись."))
 	_build_trajectory()
 
 func _build_environment() -> void:
@@ -201,6 +207,8 @@ func _intro_sequence() -> void:
 	await get_tree().create_timer(1.2).timeout
 	subtitle("Котакбас: Где я?.. Кусты. Лес. Ни одного человека в форме. Идеально.")
 	await get_tree().create_timer(2.2).timeout
+	if _ending:
+		return
 	player.set_third_person(false)
 	player.frozen = false
 	_intro_done = true
@@ -1276,44 +1284,124 @@ func _start_final_event() -> void:
 	attack_ui.show_warning("ТЦК ЗАСЕКЛО СИГНАЛ! ФИНАЛЬНЫЙ НАЛЁТ!", 5.0)
 	ufo_manager.start_raid(true)
 
+## Сюжет завершён (финальная кат-сцена уже была показана)?
+func story_completed() -> bool:
+	return bool(quests.flags.get("finished", false)) or bool(GameManager.flag("game_completed", false))
+
+## Реакция на задания: финал запускается сам, как только закрыто «Пережить финальное событие».
+func _on_quest_completed(index: int) -> void:
+	if QuestManager.QUESTS[index].id == "final_event" and not story_completed():
+		subtitle("Котакбас: Отбились... Радио снова шипит.", 3.0)
+		await get_tree().create_timer(3.5).timeout
+		_ending_sequence()
+
+## Финальная кат-сцена у радиостанции → титры. Единственная точка завершения сюжета.
 func _ending_sequence() -> void:
-	if _ending:
+	if _ending or story_completed():
 		return
 	_ending = true
 	weather.forced = false
+	if is_sleeping:
+		_wake_up("")
+	aiming = false
+	_traj.visible = false
+	buildings.cancel()
+	controls.set_build_mode(false)
 	controls.release_all()
+	if is_instance_valid(_open_menu):
+		_open_menu.queue_free()
 	_dialog_open = true
-	AudioManager.play_music("ending")
-	AudioManager.play_sfx("radio")
-	await dialogue.say("radio", "normal", "Ш-ш-ш... Котакбас... Котакбас, приём...")
-	await dialogue.say("radio", "normal", "Котакбас, мы знаем, где ты.")
-	await dialogue.say("kot", "shock", "Кто это, блять?")
-	await dialogue.say("radio", "normal", "Это только начало.")
-	dialogue.hide_box()
-	# Камера показывает голубя
+	player.frozen = true
+	player.input_move = Vector2.ZERO
+	await SceneManager.fade_out(1.2)
+	hud.visible = false
+	attack_ui.visible = false
+	controls.visible = false
+	creatures.clear_all()
+	var radio: Vector3 = pois.radio_pos
+	# Сцена всегда у радиостанции: подгружаем участки и переносим игрока туда.
+	terrain.load_around_now(radio)
+	player.global_position = Vector3(radio.x + 6.0, terrain.height(radio.x + 6.0, radio.z + 8.0) + 0.3, radio.z + 8.0)
+	player.velocity = Vector3.ZERO
+	var ground := terrain.height(radio.x + 1.0, radio.z + 2.2)
+	# Котакбас у радиостанции
+	var kot := KotakbasModel.new()
+	add_child(kot)
+	kot.global_position = Vector3(radio.x + 1.0, ground, radio.z + 2.2)
+	kot.rotation.y = atan2(-(radio.x - kot.global_position.x), -(radio.z - kot.global_position.z))
+	# Голубь на крыше будки (пока не в кадре)
 	var pg := PigeonModel.new()
 	pg.flapping = false
 	add_child(pg)
-	pg.global_position = pois.radio_pos + Vector3(0, 2.2, -0.6)
-	pg.scale = Vector3.ONE * 1.5
+	pg.global_position = radio + Vector3(0.7, 2.45, -1.0)
+	pg.scale = Vector3.ONE * 2.2
 	var cam := Camera3D.new()
+	cam.fov = 55
 	add_child(cam)
-	cam.global_position = pg.global_position + Vector3(2.5, 0.6, 2.5)
-	cam.look_at(pg.global_position)
-	cam.fov = 50
+	cam.global_position = kot.global_position + Vector3(3.5, 1.8, 3.5)
+	var look_kot := kot.global_position + Vector3(-0.5, 1.2, -0.8)
+	cam.look_at(look_kot)
 	cam.current = true
-	AudioManager.play_sfx("pigeon")
-	var tw := create_tween()
-	tw.tween_property(cam, "fov", 22.0, 3.5)
-	await tw.finished
+	# Голубь смотрит прямо в камеру
+	var pg_look := cam.global_position
+	pg_look.y = pg.global_position.y
+	pg.look_at(pg_look)
+	AudioManager.play_music("tension", 1.5)
+	await SceneManager.fade_in(1.2)
+	AudioManager.play_sfx("radio")
+	await dialogue.say("radio", "normal", "Ш-ш-ш... Котакбас...")
+	await dialogue.say("radio", "normal", "Котакбас... Мы знаем, где ты.")
+	await dialogue.say("kot", "shock", "Блять, кто это?")
+	await dialogue.say("radio", "normal", "Ты думал, что всё закончилось?")
+	dialogue.hide_box()
+	AudioManager.stop_music(0.5)
+	await get_tree().create_timer(0.6).timeout
+	AudioManager.play_sfx("pigeon", 4.0)
+	kot.play("look_up", 6.0)
+	kot.look_target = pg.global_position
+	# Камера медленно поворачивается к крыше радиостанции
+	var from_q := cam.global_transform.basis.get_rotation_quaternion()
+	var probe := Node3D.new()
+	add_child(probe)
+	probe.global_position = cam.global_position
+	probe.look_at(pg.global_position)
+	var to_q := probe.global_transform.basis.get_rotation_quaternion()
+	probe.queue_free()
+	var turn_t := 0.0
+	while turn_t < 3.5:
+		await get_tree().process_frame
+		turn_t += get_process_delta_time()
+		var k := smoothstep(0.0, 1.0, minf(turn_t / 3.5, 1.0))
+		cam.quaternion = from_q.slerp(to_q, k)
+		cam.fov = lerpf(55.0, 24.0, k)
+		if not cam.current:
+			cam.make_current()
+	AudioManager.play_sfx("pigeon", 2.0)
+	await get_tree().create_timer(0.8).timeout
+	await dialogue.say("kot", "shock", "Да ну нахуй...")
+	dialogue.hide_box()
+	# Экран резко чернеет
+	var black := ColorRect.new()
+	black.color = Color.BLACK
+	black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	menu_layer.add_child(black)
+	AudioManager.play_sfx("thud")
+	_complete_story()
+	await get_tree().create_timer(0.6).timeout
+	GameManager.show_credits(true)
+
+## Флаг прохождения: сохраняется в профиль и в сохранение (повторно финал не запустится).
+func _complete_story() -> void:
 	quests.flags["finished"] = true
+	GameManager.set_flag("game_completed", true)
 	GameManager.unlock_achievement("finish")
 	SaveManager.profile.completed = true
 	SaveManager.save_profile()
-	await get_tree().create_timer(0.8).timeout
-	GameManager.state.survival = save_state()
+	_dialog_open = false
+	player.frozen = false
 	GameManager.save_game("auto")
-	GameManager.start_chapter("ending", false)
+	if GameManager.current_slot != "auto":
+		GameManager.save_game(GameManager.current_slot)
 
 # ================================================================== Отладка (только debug-сборки)
 
@@ -1365,3 +1453,15 @@ func debug_inv() -> void: debug_ui("inv")
 func debug_craft() -> void: debug_ui("craft")
 func debug_build() -> void: debug_ui("build")
 func debug_map() -> void: debug_ui("map")
+
+func debug_ending() -> void:
+	if not GameManager.debug_enabled:
+		return
+	pois.set_generator_fixed()
+	pois.set_radio_fixed()
+	_ending_sequence()
+	while is_inside_tree():
+		await get_tree().create_timer(1.6).timeout
+		if dialogue.box.visible:
+			dialogue.tap_advance()
+			dialogue.tap_advance()

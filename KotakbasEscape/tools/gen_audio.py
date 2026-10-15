@@ -354,6 +354,10 @@ def make_music():
     m["ufo"] = song(150, 8, [2, 2, 10, 0, 2, 2, 10, 9], {"notes": Dm}, "saw", "square", [(0, 0.5), (0.5, 0.5), (1, 0.5), (1.5, 0.5), (2, 0.5), (2.5, 0.5), (3, 0.5), (3.5, 0.5)], 19, lead_gain=0.22, bass_gain=0.3, lead_density=0.9, lead_div=4)
     m["ending"] = song(76, 8, [0, 7, 9, 5, 0, 7, 5, 7], {"notes": scale_notes(0, "major", 60, 84)}, "tri", "sine", [(0, 2), (2, 2)], 23, lead_gain=0.32, pad="sine", drums=False, lead_density=0.5)
     m["credits"] = song(120, 8, [0, 9, 5, 7], {"notes": C}, "square", "tri", [(0, 1), (1, 1), (2, 1), (3, 1)], 29, lead_gain=0.25)
+    # Отдельная финальная композиция для титров: медленная, тёплая, с мягкими барабанами.
+    fin_a = song(88, 8, [0, 7, 9, 5, 0, 7, 5, 7], {"notes": scale_notes(0, "major", 60, 84)}, "tri", "sine", [(0, 2), (2, 2)], 31, lead_gain=0.32, pad="sine", drums=False, lead_density=0.5)
+    fin_b = song(88, 8, [9, 5, 0, 7, 9, 5, 2, 7], {"notes": scale_notes(0, "major", 64, 88)}, "square", "tri", [(0, 1), (1, 1), (2, 1), (3, 1)], 37, lead_gain=0.18, pad="tri", drums=True, lead_density=0.6)
+    m["finale"] = np.concatenate([fin_a, fin_b])
     for name, x in m.items():
         save(os.path.join(MUS, name + ".wav"), x, 0.6)
     print("Music:", len(m))

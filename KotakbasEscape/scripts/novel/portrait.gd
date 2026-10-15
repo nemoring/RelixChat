@@ -14,8 +14,8 @@ const SPEAKERS := {
 	"radio": {"name": "Радио", "color": Color(0.9, 0.4, 0.4)},
 	"mikhalych": {"name": "Дед Михалыч", "color": Color(0.8, 0.7, 0.5)},
 	"gena": {"name": "Лесник Гена", "color": Color(0.45, 0.75, 0.35)},
-	"interpol": {"name": "Агент Интерпола", "color": Color(0.6, 0.6, 0.9)},
-	"interpol2": {"name": "Стажёр Интерпола", "color": Color(0.9, 0.6, 0.9)},
+	"interpol": {"name": "Неизвестный агент", "color": Color(0.6, 0.6, 0.9)},
+	"interpol2": {"name": "Другой агент", "color": Color(0.9, 0.6, 0.9)},
 	"narrator": {"name": "", "color": Color(0.9, 0.9, 0.9)},
 }
 

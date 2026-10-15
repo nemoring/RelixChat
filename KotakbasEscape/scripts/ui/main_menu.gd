@@ -169,6 +169,11 @@ func _show_credits() -> void:
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.text = CreditsText.TEXT
 	sc.add_child(l)
+	var watch := UIStyle.make_button("Смотреть титры", Vector2(340, 80))
+	watch.pressed.connect(func():
+		AudioManager.play_sfx("click")
+		GameManager.show_credits(false))
+	p.content.add_child(watch)
 	_ui.add_child(p)
 
 func _on_back() -> void:

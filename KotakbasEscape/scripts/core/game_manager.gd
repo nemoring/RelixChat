@@ -15,14 +15,13 @@ const SCENES := {
 	"novel": "res://scenes/novel/novel.tscn",
 	"runner": "res://scenes/runner/runner.tscn",
 	"survival": "res://scenes/survival/survival.tscn",
-	"ending": "res://scenes/ending/ending.tscn",
+	"credits": "res://scenes/ending/credits.tscn",
 }
 
 const CHAPTER_TITLES := {
 	"novel": "Глава 1. Обычное утро Котакбаса",
 	"runner": "Глава 2. БЕГИ, КОТАКБАС!",
 	"survival": "Глава 3. Лес Котакбаса",
-	"ending": "Финал",
 }
 
 const ACHIEVEMENTS := {
@@ -148,6 +147,20 @@ func continue_game() -> bool:
 	if slot == "":
 		return false
 	return load_game(slot)
+
+## Титры. full=true — после финальной кат-сцены (с эпилогом и экраном «Игра пройдена!»),
+## false — повторный просмотр только титров.
+var credits_full := true
+
+func show_credits(full: bool) -> void:
+	credits_full = full
+	in_game = false
+	SceneManager.change_scene(SCENES.credits)
+
+## Продолжить выживание после прохождения сюжета.
+func continue_after_ending() -> void:
+	DifficultyManager.restore_level(int(state.get("difficulty", 1)))
+	start_chapter("survival", false)
 
 func go_to_menu() -> void:
 	in_game = false
