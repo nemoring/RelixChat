@@ -95,6 +95,7 @@ func _ready() -> void:
 	jumpscare.setup(self)
 	GameState.settings_changed.connect(_on_settings)
 	_on_settings()
+	_update_maglock_led()
 	if not headless_test:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if not GameState.use_touch_controls() else Input.MOUSE_MODE_VISIBLE
 	level.compute_camera_coverage.call_deferred()

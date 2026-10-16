@@ -124,6 +124,13 @@ func load_game() -> void:
 		push_warning("Сохранение повреждено, используется новое.")
 		return
 	_merge_into(data, parsed)
+	# JSON возвращает числа как float: приводим номера документов к int,
+	# иначе has(int) не находит их и документы дублируются.
+	var docs := []
+	for d in data.get("documents", []):
+		if not docs.has(int(d)):
+			docs.append(int(d))
+	data["documents"] = docs
 
 
 func save_game() -> bool:

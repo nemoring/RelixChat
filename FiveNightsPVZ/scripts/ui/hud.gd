@@ -75,6 +75,7 @@ func setup(w) -> void:
 	battery_bar.show_percentage = false
 	battery_bar.modulate = Color(1, 1, 1, 0.7)
 	battery_bar.visible = false
+	battery_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(battery_bar)
 	msg = _anchored_label(root, Control.PRESET_CENTER_BOTTOM, Vector2(-400, -230), Vector2(800, 60), 19)
 	msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -117,6 +118,9 @@ func _process(delta: float) -> void:
 		if Input.is_action_just_pressed("pause"):
 			_unpause()
 		return
+	if _modal_close.is_valid() and Input.is_action_just_pressed("pause"):
+		_modal_close.call()
+		return
 	var p: Player = world.player
 	# Пост-обработка.
 	post_mat.set_shader_parameter("brightness", float(GameState.settings["brightness"]))
@@ -151,8 +155,7 @@ func _process(delta: float) -> void:
 		_sub_t -= delta
 		sub.modulate.a = clampf(_sub_t, 0.0, 1.0)
 	if Input.is_action_just_pressed("tasks"):
-		_tasks_expanded = not _tasks_expanded
-		_refresh_tasks()
+		toggle_tasks()
 
 
 ## Направление последнего значимого звука (кроме собственных шагов).
@@ -184,6 +187,11 @@ func _prompt_text(p: Player) -> String:
 		return ""
 	var key := "[E]" if not GameState.use_touch_controls() else ""
 	return ("%s %s" % [key, p.focus_prompt]).strip_edges()
+
+
+func toggle_tasks() -> void:
+	_tasks_expanded = not _tasks_expanded
+	_refresh_tasks()
 
 
 func _refresh_tasks() -> void:
@@ -232,6 +240,9 @@ func show_intro(n: int) -> void:
 
 # ------------------------------------------------------------------ Модальные окна
 
+var _modal_close := Callable()
+
+
 func _modal_open() -> PanelContainer:
 	_close_modal()
 	modal.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -248,6 +259,7 @@ func _modal_open() -> PanelContainer:
 
 
 func _close_modal() -> void:
+	_modal_close = Callable()
 	for c in modal.get_children():
 		c.queue_free()
 	modal.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -275,11 +287,13 @@ func show_document(title: String, body: String) -> void:
 	text.custom_minimum_size = Vector2(600, 120)
 	text.add_theme_font_size_override("normal_font_size", 18)
 	v.add_child(text)
-	v.add_child(UIKit.button("Закрыть", func():
+	var close := func():
 		_close_modal()
 		if not world.game_over:
 			world.player.controls_locked = false
-		_resume_capture()))
+		_resume_capture()
+	v.add_child(UIKit.button("Закрыть  [Esc]", close))
+	_modal_close = close
 
 
 func toggle_pause() -> void:
@@ -312,10 +326,10 @@ func toggle_pause() -> void:
 			toggle_pause())))
 	v.add_child(UIKit.button("Начать ночь заново", func():
 		get_tree().paused = false
-		get_tree().reload_current_scene()))
+		get_tree().reload_current_scene.call_deferred()))
 	v.add_child(UIKit.button("В главное меню", func():
 		get_tree().paused = false
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")))
+		get_tree().change_scene_to_file.call_deferred("res://scenes/main_menu.tscn")))
 
 
 func _unpause() -> void:
@@ -347,10 +361,12 @@ func open_terminal() -> void:
 		world.submit_terminal_code(code)
 	le.text_submitted.connect(func(_s): submit.call())
 	v.add_child(UIKit.button("Ввод", submit))
-	v.add_child(UIKit.button("Отойти", func():
+	var leave := func():
 		_close_modal()
 		world.player.controls_locked = false
-		_resume_capture()))
+		_resume_capture()
+	v.add_child(UIKit.button("Отойти  [Esc]", leave))
+	_modal_close = leave
 
 
 # ------------------------------------------------------------------ Итоговые экраны
@@ -378,8 +394,8 @@ func show_game_over(entity_id: String, hint: String) -> void:
 	v.add_child(UIKit.label("Что запомнить:\n" + hint, 18))
 	v.add_child(UIKit.button("Начать ночь заново", func():
 		GameState.start_night(world.night_index, GameState.custom_difficulty if GameState.is_custom_night else {})
-		get_tree().reload_current_scene()))
-	v.add_child(UIKit.button("В главное меню", func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn")))
+		get_tree().reload_current_scene.call_deferred()))
+	v.add_child(UIKit.button("В главное меню", func(): get_tree().change_scene_to_file.call_deferred("res://scenes/main_menu.tscn")))
 
 
 func show_night_complete(n: int, violations: int) -> void:
@@ -398,8 +414,8 @@ func show_night_complete(n: int, violations: int) -> void:
 	if n < GameState.MAX_NIGHT and not GameState.is_custom_night:
 		v.add_child(UIKit.button("Ночь %d" % (n + 1), func():
 			GameState.start_night(n + 1)
-			get_tree().reload_current_scene()))
-	v.add_child(UIKit.button("В главное меню", func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn")))
+			get_tree().reload_current_scene.call_deferred()))
+	v.add_child(UIKit.button("В главное меню", func(): get_tree().change_scene_to_file.call_deferred("res://scenes/main_menu.tscn")))
 
 
 const ENDING_TEXT := {
@@ -422,4 +438,4 @@ func show_ending(id: String) -> void:
 	var e: Array = ENDING_TEXT[id]
 	v.add_child(UIKit.label("КОНЦОВКА: " + e[0], 30, UIKit.ACCENT))
 	v.add_child(UIKit.label(e[1], 18))
-	v.add_child(UIKit.button("В главное меню", func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn")))
+	v.add_child(UIKit.button("В главное меню", func(): get_tree().change_scene_to_file.call_deferred("res://scenes/main_menu.tscn")))

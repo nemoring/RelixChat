@@ -65,9 +65,8 @@ func _build_ui() -> void:
 	layer.add_child(ui)
 	var shade := ColorRect.new()
 	shade.color = Color(0, 0, 0, 0.55)
-	shade.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	shade.size = Vector2(460, 0)
-	shade.custom_minimum_size = Vector2(460, 0)
+	shade.anchor_bottom = 1.0
+	shade.offset_right = 460.0
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(shade)
 	menu_box = VBoxContainer.new()
@@ -123,7 +122,7 @@ func _start(n: int, custom := {}) -> void:
 	if n <= 0:
 		return
 	GameState.start_night(n, custom)
-	get_tree().change_scene_to_file("res://scenes/game.tscn")
+	get_tree().change_scene_to_file.call_deferred("res://scenes/game.tscn")
 
 
 func _new_game() -> void:
@@ -207,10 +206,15 @@ func _extras() -> void:
 			v.add_child(UIKit.label("· не найден", 15, UIKit.DIM))
 	if GameState.data.get("custom_unlocked", false):
 		v.add_child(UIKit.button("Пользовательская ночь", _custom_night))
-	v.add_child(UIKit.button("Сбросить прогресс", func():
+	var reset_btn := UIKit.button("Сбросить прогресс", func(): pass)
+	reset_btn.pressed.connect(func():
+		if reset_btn.text != "Точно сбросить? Нажмите ещё раз":
+			reset_btn.text = "Точно сбросить? Нажмите ещё раз"
+			return
 		GameState.reset_progress()
 		_main()
-		_clear_side()))
+		_clear_side())
+	v.add_child(reset_btn)
 
 
 func _show_doc(i: int) -> void:

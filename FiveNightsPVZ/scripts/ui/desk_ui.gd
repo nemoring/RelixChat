@@ -23,6 +23,8 @@ var tasks_list: VBoxContainer
 var panel_box: VBoxContainer
 var _refresh_t := 0.0
 var _lock_indicator_lies := false
+var _lie_t := 0.0
+var _sigs := {}
 
 
 func setup(w) -> void:
@@ -97,10 +99,15 @@ func _process(delta: float) -> void:
 		cam_clock.text = "● REC  %s  %s" % [Story.NIGHT_DATES[clampi(world.night_index, 1, 6)], world.cctv.clock_for_feed()]
 		for i in cam_buttons.size():
 			cam_buttons[i].modulate = Color(0.6, 0.9, 1.0) if i == world.cctv.current else Color.WHITE
+	# На поздних ночах индикатор двери иногда «врёт» — несколько десятков секунд подряд.
+	_lie_t -= delta
+	if _lie_t <= 0.0:
+		_lie_t = randf_range(20.0, 40.0)
+		_lock_indicator_lies = world.night_index >= 4 and randf() < 0.3
 	_refresh_t -= delta
 	if _refresh_t <= 0.0:
-		_refresh_t = 1.0
-		_refresh_all()
+		_refresh_t = 0.5
+		_refresh_all(false)
 
 
 func _on_tab(i: int) -> void:
@@ -108,12 +115,38 @@ func _on_tab(i: int) -> void:
 	_refresh_all()
 
 
-func _refresh_all() -> void:
-	_refresh_orders()
-	_refresh_return()
-	_refresh_mail_list()
-	_refresh_tasks()
-	_refresh_panel()
+## Перестраивает разделы только при изменении данных: иначе кнопка под курсором
+## пересоздаётся между нажатием и отпусканием, и клик теряется.
+func _refresh_all(force := true) -> void:
+	if force:
+		_sigs.clear()
+	var orders_sig := str(world.orders.active_cards.map(func(c): return [c["no"], c.get("opened", false)]))
+	if _changed("orders", orders_sig):
+		_refresh_orders()
+	var r = world.entities.get("returner")
+	if _changed("return", str([r.state, r.request.get("no", "")]) if r else ""):
+		_refresh_return()
+	if _changed("mail", str(world.night.mails.map(func(m): return [m["id"], m["read"], m["reported"]]))):
+		_refresh_mail_list()
+	if _changed("tasks", str([world.night.violations, int(world.night.minute()), world.night.tasks.map(func(t): return [t["id"], t["done"], t["failed"], t["title"], t.get("progress", "")])])):
+		_refresh_tasks()
+	if _changed("panel", _panel_sig()):
+		_refresh_panel()
+
+
+func _changed(key: String, sig: String) -> bool:
+	if _sigs.get(key, null) == sig:
+		return false
+	_sigs[key] = sig
+	return true
+
+
+func _panel_sig() -> String:
+	var lt: Lighting = world.level.lighting
+	var z := []
+	for zone in ["hall", "workstation", "warehouse", "corridor", "fitting"]:
+		z.append([lt.switches[zone], lt.is_zone_powered(zone)])
+	return str([z, world.level.doors["front"].locked, _lock_indicator_lies, lt.tripped_breakers(), int(world.player.battery)])
 
 
 # ------------------------------------------------------------------ Камеры
@@ -415,9 +448,6 @@ func _refresh_panel() -> void:
 		grid.add_child(b)
 	panel_box.add_child(HSeparator.new())
 	var locked: bool = world.level.doors["front"].locked
-	# На поздних ночах индикатор иногда «врёт» — проверьте дверь или камеру.
-	if world.night_index >= 4 and randf() < 0.15:
-		_lock_indicator_lies = not _lock_indicator_lies
 	var shown_locked := locked if not _lock_indicator_lies else true
 	panel_box.add_child(UIKit.label("Входная дверь: %s" % ("ЗАБЛОКИРОВАНА" if shown_locked else "РАЗБЛОКИРОВАНА"), 17, UIKit.TEXT if shown_locked else UIKit.DANGER))
 	var tripped := lt.tripped_breakers()

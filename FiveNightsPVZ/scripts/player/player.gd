@@ -105,6 +105,9 @@ func apply_settings() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if controls_locked:
 		return
+	# Мышь, эмулированная из касаний, не должна «взаимодействовать» по каждому тапу.
+	if event is InputEventMouse and (event as InputEventMouse).device == InputEvent.DEVICE_ID_EMULATION:
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not seated:
 		var sens: float = GameState.settings.get("mouse_sens", 0.25) * 0.01
 		_rotate_view(-event.relative.x * sens, -event.relative.y * sens)

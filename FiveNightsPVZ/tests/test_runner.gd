@@ -4,6 +4,7 @@ extends Node
 
 const SUITES := [
 	"res://tests/test_scenes.gd",
+	"res://tests/test_menu.gd",
 	"res://tests/test_save.gd",
 	"res://tests/test_navigation.gd",
 	"res://tests/test_cameras.gd",

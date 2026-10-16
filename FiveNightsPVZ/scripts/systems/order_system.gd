@@ -31,7 +31,7 @@ func setup(w, night: int, seed_v: int) -> void:
 		var spot: DropSpot = w.level.cells[cell_id]
 		spot.accept_fn = _cell_accept.bind(cell_id)
 		spot.action = _cell_check.bind(cell_id)
-		spot.prompt_text = ""
+		spot.prompt_text = "Сверить ячейку %s" % cell_id
 
 
 func _next_no() -> String:
