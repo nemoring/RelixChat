@@ -332,7 +332,7 @@ func _check_fake_triggers() -> void:
 # ------------------------------------------------------------------ Метки, документы
 
 const CHECKPOINTS := {
-	"cp_warehouse": [Vector3(0.12, 1.3, 5.6), Vector3(0, 90, 0)],
+	"cp_warehouse": [Vector3(0.12, 1.3, 6.25), Vector3(0, 90, 0)],
 	"cp_corridor": [Vector3(13.88, 1.3, 11.6), Vector3(0, -90, 0)],
 	"cp_utility": [Vector3(17.88, 1.3, 4.4), Vector3(0, -90, 0)],
 	"cp_entrance": [Vector3(3.28, 1.3, 14.3), Vector3(0, -90, 0)],

@@ -13,6 +13,7 @@ var _cloth: Node3D
 
 func build(width: float) -> void:
 	_width = width
+	collision_layer = Build.LAYER_INTERACT | Build.LAYER_WORLD
 	Build.cyl(self, 0.012, width + 0.3, Vector3(0, 2.18, 0.0), Mats.metal(), Vector3(0, 0, 90), 6)
 	_cloth = Node3D.new()
 	add_child(_cloth)

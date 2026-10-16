@@ -68,6 +68,9 @@ var tech_terminal: Interactable
 var own_box: Node3D
 var room_areas := {}
 var cam_mount_nodes: Array[Node3D] = []
+## Коллизии, через которые проходит луч взаимодействия (стеллажи: коробки
+## лежат внутри их объёма, но сквозь стеллаж нельзя пройти).
+var ray_transparent: Array[RID] = []
 
 var _card_xforms: Array[Transform3D] = []
 var _rng := RandomNumberGenerator.new()
@@ -284,7 +287,9 @@ func _rack(origin: Vector3, sections: int, sec_w: float, depth: float, facing_z:
 		Build.box(rack, Vector3(total, 0.06, 0.02), Vector3(total * 0.5, lv + 0.02, facing_z * depth * 0.5), Mats.color(Color(0.9, 0.45, 0.1), 0.6))
 	var col := Node3D.new()
 	rack.add_child(col)
-	Build.add_box_collider(col, Vector3(total, 2.4, depth)).position = Vector3(total * 0.5, 1.2, 0)
+	var rack_body := Build.add_box_collider(col, Vector3(total, 2.4, depth))
+	rack_body.position = Vector3(total * 0.5, 1.2, 0)
+	ray_transparent.append(rack_body.get_rid())
 	for s in sections:
 		var cell_id := "%s-%d" % [letter, s + 1]
 		var cx := s * sec_w + sec_w * 0.5
@@ -338,7 +343,9 @@ func _build_warehouse() -> void:
 				var w := _rng.randf_range(0.3, 0.6)
 				var h := _rng.randf_range(0.25, 0.6)
 				_card_xforms.append(Transform3D(Basis().scaled(Vector3(w, h, 0.5)).rotated(Vector3.UP, -PI * 0.5 + _rng.randf_range(-0.2, 0.2)), Vector3(0.4, lv + h * 0.5 + 0.02, 1.0 + i * 0.8 + 0.3)))
-	Build.add_box_collider(old, Vector3(4.8, 2.4, 0.6)).position = Vector3(2.4, 1.2, 0)
+	var old_body := Build.add_box_collider(old, Vector3(4.8, 2.4, 0.6))
+	old_body.position = Vector3(2.4, 1.2, 0)
+	ray_transparent.append(old_body.get_rid())
 	# Рольставня приёмки.
 	var sh := Node3D.new()
 	add_child(sh)
@@ -486,7 +493,9 @@ func _build_workstation() -> void:
 				var w := _rng.randf_range(0.2, 0.4)
 				var h := _rng.randf_range(0.12, 0.3)
 				_card_xforms.append(Transform3D(Basis().scaled(Vector3(w, h, 0.3)).rotated(Vector3.UP, PI), shelf.position + Vector3(0.2 + i * 0.58, y + 0.015 + h * 0.5, 0)))
-	Build.add_box_collider(shelf, Vector3(3.0, 2.0, 0.4)).position = Vector3(1.5, 1.0, 0)
+	var shelf_body := Build.add_box_collider(shelf, Vector3(3.0, 2.0, 0.4))
+	shelf_body.position = Vector3(1.5, 1.0, 0)
+	ray_transparent.append(shelf_body.get_rid())
 	# Телефон на стене.
 	var ph := Node3D.new()
 	ph.position = Vector3(11.88, 1.4, 7.6)
@@ -654,6 +663,9 @@ func _build_fitting() -> void:
 		var x0 := 0.0 if i == 0 else 2.2
 		var cx := x0 + 1.1
 		var room := "cab_a" if i == 0 else "cab_b"
+		# Номер кабинки над шторкой — задания ссылаются на «Примерочную 1/2».
+		var num := Build.label(self, "ПРИМЕРОЧНАЯ %d" % (i + 1), Vector3(cx, 2.55, 10.11), 0.09, Color(0.9, 0.88, 0.8))
+		num.shaded = false
 		var curtain := Curtain.new()
 		curtain.cabin_index = i
 		curtain.position = Vector3(cx, 0, 10.0)

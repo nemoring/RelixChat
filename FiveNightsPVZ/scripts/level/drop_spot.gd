@@ -15,11 +15,19 @@ var verb := "Положить"
 var stored: Array = []
 
 
+## Необязательно: когда действие без предмета доступно (например, сверка ячейки).
+var action_available: Callable
+
+
 func prompt(player) -> String:
 	if not enabled:
 		return ""
 	if player.held_item == null:
-		return prompt_text if action.is_valid() else ""
+		if not action.is_valid():
+			return ""
+		if action_available.is_valid() and not action_available.call():
+			return ""
+		return prompt_text
 	return "%s: %s" % [verb, player.held_item.describe()]
 
 

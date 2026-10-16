@@ -56,6 +56,9 @@ func test_edges_clear_of_walls() -> void:
 	await frames(3)
 	for d in g.level.doors.values():
 		(d as Door).set_open(true, true)
+	# Шторки, как и двери, сущность открывает перед проходом.
+	for c in g.level.cabins:
+		(c["curtain"] as Curtain).set_open(true, true)
 	await frames(3)
 	var space := g.get_world_3d().direct_space_state
 	var nav := g.level.nav

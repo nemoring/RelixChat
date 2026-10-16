@@ -10,6 +10,7 @@ var layer: CanvasLayer
 var post: ColorRect
 var post_mat: ShaderMaterial
 var crosshair: ColorRect
+var _crosshair_shadow: ColorRect
 var prompt: Label
 var held: Label
 var clock: Label
@@ -51,12 +52,14 @@ func setup(w) -> void:
 	root.theme = UIKit.theme()
 	layer.add_child(root)
 	crosshair = ColorRect.new()
-	crosshair.color = Color(1, 1, 1, 0.55)
-	crosshair.size = Vector2(4, 4)
-	crosshair.set_anchors_preset(Control.PRESET_CENTER)
-	crosshair.position = Vector2(-2, -2)
+	crosshair.color = Color(1, 1, 1, 0.8)
 	crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(crosshair)
+	_crosshair_shadow = ColorRect.new()
+	_crosshair_shadow.color = Color(0, 0, 0, 0.6)
+	_crosshair_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_crosshair_shadow)
+	root.move_child(_crosshair_shadow, crosshair.get_index())
 	prompt = _anchored_label(root, Control.PRESET_CENTER, Vector2(-300, 30), Vector2(600, 30), 20)
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	held = _anchored_label(root, Control.PRESET_CENTER_BOTTOM, Vector2(-300, -150), Vector2(600, 26), 16, UIKit.DIM)
@@ -134,9 +137,16 @@ func _process(delta: float) -> void:
 	# Подсказка.
 	var show_ui: bool = not p.seated and not world.game_over
 	prompt.text = _prompt_text(p) if show_ui else ""
-	crosshair.visible = show_ui
-	crosshair.size = Vector2(8, 8) if p.focus else Vector2(4, 4)
-	crosshair.position = -crosshair.size * 0.5
+	# Точка-прицел: всегда в центре экрана; при наведении на объект — крупнее и жёлтая.
+	var center := crosshair.get_parent_control().size * 0.5
+	var cs := Vector2(10, 10) if p.focus else Vector2(5, 5)
+	crosshair.visible = show_ui and not p.is_hidden() or (show_ui and p.focus != null)
+	crosshair.size = cs
+	crosshair.position = (center - cs * 0.5).round()
+	crosshair.color = Color(1.0, 0.85, 0.35, 0.95) if p.focus else Color(1, 1, 1, 0.85)
+	_crosshair_shadow.visible = crosshair.visible
+	_crosshair_shadow.size = cs + Vector2(2, 2)
+	_crosshair_shadow.position = crosshair.position - Vector2(1, 1)
 	held.text = ("В руках: %s   [G] положить на пол" % p.held_item.describe()) if p.held_item and show_ui else ""
 	if p.hiding_in and show_ui:
 		held.text = "Вы прячетесь %s. [E] — выйти" % p.hiding_in.spot_name

@@ -32,6 +32,7 @@ func setup(w, night: int, seed_v: int) -> void:
 		spot.accept_fn = _cell_accept.bind(cell_id)
 		spot.action = _cell_check.bind(cell_id)
 		spot.prompt_text = "Сверить ячейку %s" % cell_id
+		spot.action_available = func(): return cell_id in world.night.inventory_cells and not world.night.find_task("inventory").is_empty()
 
 
 func _next_no() -> String:

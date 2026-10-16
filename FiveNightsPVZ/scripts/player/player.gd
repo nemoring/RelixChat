@@ -244,25 +244,40 @@ func _update_focus() -> void:
 	var from := cam.global_position
 	var to := from - cam.global_basis.z * REACH
 	var exclude: Array[RID] = [get_rid()]
-	for i in 4:
+	if GameWorld.instance and GameWorld.instance.level:
+		exclude.append_array(GameWorld.instance.level.ray_transparent)
+	# Первый подходящий объект по лучу. Если руки пусты и первым попалось
+	# «место хранения» (ячейка, стойка), смотрим дальше: коробка внутри ячейки
+	# важнее действия самой ячейки — иначе коробку нельзя было бы взять.
+	var fallback: Interactable = null
+	var fallback_prompt := ""
+	for i in 6:
 		var q := PhysicsRayQueryParameters3D.create(from, to, Build.LAYER_INTERACT | Build.LAYER_WORLD, exclude)
 		var r := space.intersect_ray(q)
 		if r.is_empty():
-			return
+			break
 		var col: Object = r.collider
-		if col is Interactable:
-			var ia := col as Interactable
-			if hiding_in and ia != hiding_in:
-				exclude.append(ia.get_rid())
-				continue
-			var p := ia.prompt(self)
-			if p != "":
-				focus = ia
-				focus_prompt = p
-				return
-			exclude.append(ia.get_rid())
-		else:
-			return
+		if not (col is Interactable):
+			break
+		var ia := col as Interactable
+		exclude.append(ia.get_rid())
+		if hiding_in and ia != hiding_in:
+			continue
+		var p := ia.prompt(self)
+		if p == "":
+			continue
+		if ia is DropSpot and held_item == null:
+			if fallback == null:
+				fallback = ia
+				fallback_prompt = p
+			continue
+		focus = ia
+		focus_prompt = p
+		return
+	if fallback:
+		focus = fallback
+		focus_prompt = fallback_prompt
+		return
 	if hiding_in:
 		focus = hiding_in
 		focus_prompt = hiding_in.prompt(self)

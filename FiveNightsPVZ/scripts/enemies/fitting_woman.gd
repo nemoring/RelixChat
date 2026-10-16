@@ -62,15 +62,16 @@ func _say(line: String) -> void:
 
 
 func _enable_spot(on: bool) -> void:
+	# Обе кабинки принимают одежду: у «не той» игрок слышит подсказку.
 	for i in world.level.cabins.size():
-		(world.level.cabins[i]["spot"] as DropSpot).enabled = on and i == cabin
+		(world.level.cabins[i]["spot"] as DropSpot).enabled = on
 
 
 func _accept_item(box: CarryBox, idx: int) -> String:
 	if box.kind != "clothes":
 		return "Это не одежда."
 	if idx != cabin:
-		return "[за этой шторкой тихо]"
+		return "[за этой шторкой тихо. Голос доносится из примерочной %d]" % (cabin + 1)
 	if (world.level.cabins[idx]["curtain"] as Curtain).is_open:
 		return "Задёрните шторку."
 	return ""
