@@ -170,6 +170,8 @@ func since_threat() -> float:
 func request_escalation(entity: String, cost: int) -> bool:
 	if _finale:
 		return true
+	if phase == Phase.RELIEF:
+		return false
 	var aggr: int = NightData.aggression(night, entity.split("_")[0]) if entity.split("_")[0] in NightData.ENTITIES else night * 2
 	var chance := aggr / 20.0
 	match phase:
@@ -246,7 +248,7 @@ func on_door_unlocked() -> void:
 	var f = world.entities.get("faceless")
 	if f and f.aggression > 0 and f.state == "hidden" and night >= 2:
 		get_tree().create_timer(rng.randf_range(6.0, 20.0)).timeout.connect(func():
-			if world.level.doors["front"].locked == false and f.state == "hidden":
+			if is_instance_valid(f) and world.level.doors["front"].locked == false and f.state == "hidden":
 				f.appear_outside())
 
 
@@ -254,7 +256,9 @@ func on_fake_followed(action: String) -> void:
 	_log("fake_followed", action)
 	var insp = world.entities.get("inspector")
 	if insp:
-		get_tree().create_timer(rng.randf_range(3.0, 7.0)).timeout.connect(func(): insp.behind_event())
+		get_tree().create_timer(rng.randf_range(3.0, 7.0)).timeout.connect(func():
+			if is_instance_valid(insp) and not world.game_over:
+				insp.behind_event())
 	if action == "unlock_door":
 		on_door_unlocked()
 	if action == "warehouse_dark" and world.entities.has("courier"):

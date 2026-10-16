@@ -999,7 +999,7 @@ func _build_nav() -> void:
 		["ws_center", "ws_flap"], ["ws_flap", "hall_flap"], ["hall_flap", "hall_counter"], ["hall_flap", "hall_center"],
 		["hall_counter", "hall_center"], ["hall_counter", "hall_e"], ["hall_center", "hall_w"], ["hall_center", "hall_e"],
 		["hall_center", "hall_window"], ["hall_e", "hall_window"], ["hall_w", "cab_a_front"], ["hall_w", "cab_b_front"],
-		["cab_a_front", "cab_b_front"], ["cab_b_front", "hall_center"], ["hall_w", "vest"], ["hall_center", "vest"],
+		["cab_a_front", "cab_b_front"], ["cab_b_front", "hall_center"], ["hall_w", "vest"],
 		["outside", "street"], ["outside", "street_e"], ["street", "street_e"],
 		["cab_a_front", "cab_a"], ["cab_b_front", "cab_b"],
 		["cor_1", "cor_2"], ["cor_2", "cor_3"], ["cor_3", "cor_4"],

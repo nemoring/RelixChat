@@ -206,10 +206,11 @@ func show_document(title: String, body: String) -> void:
 
 func on_item_picked(box: CarryBox) -> void:
 	if box.kind == "clothes":
-		var idx := _clothes_sizes.find(box.size_label)
+		var size := box.size_label
+		var idx := _clothes_sizes.find(size)
 		if idx >= 0:
 			get_tree().create_timer(25.0).timeout.connect(func():
-				if is_instance_valid(level) and not _rail_has(box.size_label):
+				if is_instance_valid(level) and not _rail_has(size):
 					_spawn_clothes(idx))
 
 

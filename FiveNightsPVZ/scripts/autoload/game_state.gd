@@ -30,6 +30,10 @@ const ENDINGS := {
 
 const DOCUMENT_COUNT := 5
 
+## Пути можно переопределить (тесты пишут во временные файлы).
+var save_path := SAVE_PATH
+var settings_path := SETTINGS_PATH
+
 ## Сохраняемые данные.
 var data := {}
 ## Настройки.
@@ -109,9 +113,9 @@ func _default_quality() -> int:
 
 func load_game() -> void:
 	data = default_data()
-	if not FileAccess.file_exists(SAVE_PATH):
+	if not FileAccess.file_exists(save_path):
 		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var f := FileAccess.open(save_path, FileAccess.READ)
 	if f == null:
 		return
 	var parsed = JSON.parse_string(f.get_as_text())
@@ -123,7 +127,7 @@ func load_game() -> void:
 
 
 func save_game() -> bool:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
 		push_error("Не удалось записать сохранение: %s" % FileAccess.get_open_error())
 		return false
@@ -150,7 +154,7 @@ func _merge_into(target: Dictionary, src: Dictionary) -> void:
 func load_settings() -> void:
 	settings = default_settings()
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS_PATH) != OK:
+	if cfg.load(settings_path) != OK:
 		return
 	for k in settings.keys():
 		if cfg.has_section_key("settings", k):
@@ -163,7 +167,7 @@ func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	for k in settings.keys():
 		cfg.set_value("settings", k, settings[k])
-	cfg.save(SETTINGS_PATH)
+	cfg.save(settings_path)
 
 
 func set_setting(key: String, value) -> void:
