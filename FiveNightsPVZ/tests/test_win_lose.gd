@@ -91,6 +91,7 @@ func test_courier_sees_lit_player() -> void:
 	var c: Courier = g.entities["courier"]
 	var p := g.player
 	p.global_position = Vector3(10.4, 0, 3.95)
+	p.current_room = "warehouse"
 	c.activate()
 	c.global_position = g.level.nav.pos_of("wh_w")
 	c.face(p.global_position)
@@ -103,6 +104,7 @@ func test_courier_sees_lit_player() -> void:
 	c = g.entities["courier"]
 	p = g.player
 	p.global_position = Vector3(10.4, 0, 3.95)
+	p.current_room = "warehouse"
 	p.crouching = true
 	c.activate()
 	c.global_position = g.level.nav.pos_of("wh_w")

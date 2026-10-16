@@ -91,9 +91,13 @@ func is_blocking() -> bool:
 
 
 ## Сущность ломится в дверь: несколько ударов, затем открывает.
+var _forcing := false
+
+
 func entity_force(seconds: float) -> void:
-	if is_open or _busy:
+	if is_open or _forcing:
 		return
+	_forcing = true
 	_busy = true
 	var t := 0.0
 	while t < seconds:
@@ -107,5 +111,6 @@ func entity_force(seconds: float) -> void:
 		if is_open:
 			break
 	_busy = false
+	_forcing = false
 	if not locked:
 		set_open(true, false, 0.6)
