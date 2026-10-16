@@ -156,7 +156,7 @@ func cam_usage() -> float:
 
 ## Игрок «окопался»: слишком долго в одном месте или почти всё время в камерах.
 func player_camping() -> bool:
-	return room_dwell > 150.0 - night * 12.0 or cam_usage() > 0.65
+	return room_dwell > 240.0 - night * 20.0 or cam_usage() > 0.7
 
 
 func since_threat() -> float:

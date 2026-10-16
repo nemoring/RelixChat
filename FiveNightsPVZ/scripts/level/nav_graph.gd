@@ -52,8 +52,15 @@ func door_between(a: String, b: String) -> Door:
 
 
 ## Путь как массив имён точек. can_open_doors=false — закрытые двери непроходимы.
-func path(from_name: String, to_name: String, can_open_doors := true, avoid_locked := true) -> PackedStringArray:
+func path(from_name: String, to_name: String, can_open_doors := true, avoid_locked := true, avoid_rooms: Array = []) -> PackedStringArray:
 	var disabled := []
+	var off_points := []
+	if not avoid_rooms.is_empty():
+		for id in points.keys():
+			var pn: String = points[id]["name"]
+			if points[id]["room"] in avoid_rooms and pn != from_name and pn != to_name:
+				astar.set_point_disabled(id, true)
+				off_points.append(id)
 	for k in door_edges.keys():
 		var d: Door = door_edges[k]
 		var blocked := (not can_open_doors and d.is_blocking()) or (avoid_locked and d.locked and not d.is_open)
@@ -67,6 +74,8 @@ func path(from_name: String, to_name: String, can_open_doors := true, avoid_lock
 	var ids := astar.get_id_path(names[from_name], names[to_name])
 	for e in disabled:
 		astar.connect_points(e[0], e[1], true)
+	for id in off_points:
+		astar.set_point_disabled(id, false)
 	var out := PackedStringArray()
 	for id in ids:
 		out.append(points[id]["name"])

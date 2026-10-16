@@ -96,8 +96,14 @@ func _calm() -> void:
 
 
 func on_timeout() -> void:
-	if state == "requesting":
-		_agitate()
+	if state != "requesting":
+		return
+	if world.night_index == 1 and not GameState.is_custom_night:
+		# Обучающая ночь: голос просто замолкает.
+		world.subtitle("[голос в примерочной затих]", 3.0)
+		_calm()
+		return
+	_agitate()
 
 
 func _agitate() -> void:

@@ -78,12 +78,12 @@ func set_vis_layers(layers: int) -> void:
 
 # ------------------------------------------------------------------ Движение
 
-func go_to(target_point: String, spd := -1.0) -> bool:
+func go_to(target_point: String, spd := -1.0, avoid_rooms: Array = []) -> bool:
 	if spd > 0:
 		speed = spd
 	var nav: NavGraph = world.level.nav
 	point = nav.nearest(global_position)
-	_path = nav.path(point, target_point, can_open_doors)
+	_path = nav.path(point, target_point, can_open_doors, true, avoid_rooms)
 	_path_i = 0
 	_moving = _path.size() > 0
 	return _moving

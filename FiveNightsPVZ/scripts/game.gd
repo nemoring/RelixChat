@@ -32,6 +32,7 @@ var _fps_high := 0.0
 var _clothes_sizes := ["42", "44", "46", "48", "50", "52"]
 var stare_value := 0.0
 var headless_test := false
+var death_cause := ""
 
 
 func _enter_tree() -> void:
@@ -473,6 +474,7 @@ func kill_player(entity_id: String, hint: String) -> void:
 	if game_over:
 		return
 	game_over = true
+	death_cause = entity_id
 	night.running = false
 	if player.seated:
 		desk.close()

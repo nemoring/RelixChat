@@ -71,6 +71,15 @@ func test_edges_clear_of_walls() -> void:
 	await stop_game(g)
 
 
+func test_avoid_rooms() -> void:
+	var g := await start_game(2)
+	var p := g.level.nav.path("cor_3", "wh_se", true, true, ["workstation"])
+	check(p.size() > 0, "обходной путь есть")
+	for n in p:
+		check(g.level.nav.room_of(n) != "workstation", "путь не проходит через рабочее место")
+	await stop_game(g)
+
+
 func test_entity_walks_to_target() -> void:
 	var g := await start_game(3)
 	var c: Courier = g.entities["courier"]

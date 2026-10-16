@@ -81,6 +81,7 @@ func _build_ui() -> void:
 	side.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(side)
 	_status = UIKit.label("", 14, UIKit.DIM)
+	_status.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_status.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	_status.position = Vector2(48, -40)
 	ui.add_child(_status)

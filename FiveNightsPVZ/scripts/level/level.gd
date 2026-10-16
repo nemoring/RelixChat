@@ -253,6 +253,15 @@ func _build_street() -> void:
 	car.position = Vector3(-3.0, 0, 21.5)
 	Build.box(car, Vector3(4.2, 0.7, 1.8), Vector3(0, 0.55, 0), Mats.color(Color(0.18, 0.2, 0.22), 0.3, 0.4))
 	Build.box(car, Vector3(2.2, 0.55, 1.6), Vector3(-0.2, 1.15, 0), Mats.color(Color(0.05, 0.06, 0.07), 0.1, 0.5))
+	# Тусклый фонарь над входом: фигуру за стеклом можно разглядеть.
+	var door_lamp := OmniLight3D.new()
+	door_lamp.position = Vector3(1.6, 2.7, 16.7)
+	door_lamp.light_color = Color(0.85, 0.9, 1.0)
+	door_lamp.light_energy = 0.7
+	door_lamp.omni_range = 4.5
+	add_child(door_lamp)
+	lighting.register_extra("street", door_lamp)
+	Build.box(self, Vector3(0.3, 0.08, 0.15), Vector3(1.6, 2.75, 16.42), Mats.emissive(Color(0.9, 0.95, 1.0), 1.5))
 	spawn["faceless_outside"] = Vector3(1.6, 0, 17.3)
 	spawn["street_far"] = Vector3(-6.0, 0, 18.0)
 

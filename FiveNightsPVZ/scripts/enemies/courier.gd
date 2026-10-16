@@ -61,11 +61,16 @@ func _next_patrol() -> void:
 		options = options.filter(func(n): return not (cam_i in nav.cam_coverage.get(n, [])))
 	# При долгом сидении игрока на одном месте директор направляет его ближе.
 	if world.director.player_camping() and world.director.request_escalation("courier", 2):
-		go_to(nav.nearest(world.player.global_position), _speed_walk())
+		# На ранних ночах — только стучит в дверь рабочего места (предупреждение).
+		var target := nav.nearest(world.player.global_position) if aggression >= 8 else "wh_door_ws"
+		go_to(target, _speed_walk())
 		return
 	if options.is_empty():
 		options = PATROL_POINTS.duplicate()
-	go_to(options[rng.randi() % options.size()], _speed_walk())
+	# Обычный обход не идёт через рабочее место и зал.
+	var avoid := ["workstation", "hall", "vestibule"] if aggression < 9 else []
+	if not go_to(options[rng.randi() % options.size()], _speed_walk(), avoid):
+		go_to("wh_mid", _speed_walk())
 
 
 func _tick(delta: float) -> void:

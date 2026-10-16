@@ -69,7 +69,7 @@ func test_phase_lengths_vary() -> void:
 
 func test_camping_detection() -> void:
 	var g := await start_game(3)
-	g.director.room_dwell = 500.0
+	g.director.room_dwell = 900.0
 	check(g.director.player_camping(), "долгое сидение на месте замечается")
 	g.director.room_dwell = 0.0
 	g.director.cam_history.clear()

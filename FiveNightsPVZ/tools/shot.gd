@@ -8,7 +8,7 @@ func _ready() -> void:
 		GameState.current_night = int(a[7])
 	var out := a[6] if a.size() > 6 else "user://shot.png"
 	if scene == "menu":
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		get_tree().root.add_child.call_deferred(load("res://scenes/main_menu.tscn").instantiate())
 		await get_tree().create_timer(3.0).timeout
 	else:
 		var g: Node = load("res://scenes/game.tscn").instantiate()
@@ -22,7 +22,19 @@ func _ready() -> void:
 			p.toggle_flashlight()
 		if a.size() > 8 and a[8] == "desk":
 			GameWorld.instance.open_desk()
+		if a.size() > 8 and a[8] == "entities":
+			var w := GameWorld.instance
+			w.hud.overlay.color.a = 0.0
+			w.entities["faceless"].show_at("hall_counter", p.global_position)
+			w.entities["woman"].show_at("hall_center", p.global_position)
+			w.entities["courier"].show_at("hall_e", p.global_position)
+			w.entities["returner"].visits = 3
+			w.entities["returner"]._apply_stage()
+			w.entities["returner"].show_at("hall_w", p.global_position)
+			w.entities["inspector"].show_at("hall_window", p.global_position)
+			w.entities["inspector"].set_vis_layers(1)
 		await get_tree().create_timer(1.5).timeout
+		GameWorld.instance.hud.overlay.color.a = 0.0
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(out)
 	print("saved ", out)
