@@ -544,7 +544,7 @@ func _gen_phone() -> PackedFloat32Array:
 	for i in a.size():
 		var t := float(i) / RATE
 		var on := 1.0 if fmod(t, 5.0) < 1.0 else 0.0
-		var bell := sin(TAU * 425.0 * t) * (0.5 + 0.5 * sign(sin(TAU * 25.0 * t)))
+		var bell: float = sin(TAU * 425.0 * t) * (0.5 + 0.5 * signf(sin(TAU * 25.0 * t)))
 		a[i] = bell * on * 0.4
 	return _lowpass(a, 3000.0)
 

@@ -21,8 +21,8 @@ static func surface(key: String) -> Material:
 			m.set_shader_parameter("alt_color", Color(0.42, 0.4, 0.37))
 			m.set_shader_parameter("grout_color", Color(0.2, 0.19, 0.17))
 			m.set_shader_parameter("tile_size", Vector2(0.4, 0.4))
-			m.set_shader_parameter("dirt", 0.45)
-			m.set_shader_parameter("wet", 0.15)
+			m.set_shader_parameter("dirt", 0.6)
+			m.set_shader_parameter("wet", 0.2)
 		"wall_tile":
 			m.set_shader_parameter("mode", 1)
 			m.set_shader_parameter("base_color", Color(0.72, 0.76, 0.74))
@@ -33,9 +33,10 @@ static func surface(key: String) -> Material:
 			m.set_shader_parameter("dirt", 0.3)
 		"wall_paint":
 			m.set_shader_parameter("mode", 0)
-			m.set_shader_parameter("base_color", Color(0.74, 0.72, 0.66))
-			m.set_shader_parameter("leaks", 0.35)
-			m.set_shader_parameter("dirt", 0.25)
+			m.set_shader_parameter("base_color", Color(0.66, 0.64, 0.56))
+			m.set_shader_parameter("leaks", 0.65)
+			m.set_shader_parameter("dirt", 0.45)
+			m.set_shader_parameter("floor_grime", 0.8)
 		"wall_green":
 			# советская панель: крашено зелёным до середины
 			m.set_shader_parameter("mode", 0)

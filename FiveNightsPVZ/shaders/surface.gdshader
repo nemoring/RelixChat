@@ -74,7 +74,7 @@ void fragment() {
 	}
 
 	// Грязь и пятна.
-	float d = smoothstep(0.45, 0.85, fbm(uv * 0.6 + 11.0)) * dirt;
+	float d = (smoothstep(0.38, 0.72, fbm(uv * 0.6 + 11.0)) * 0.8 + smoothstep(0.5, 0.9, vnoise(uv * 7.0 + 2.0)) * 0.25) * dirt;
 	if (is_wall) {
 		float h = wpos.y;
 		d += smoothstep(0.5, 0.0, h) * floor_grime * (0.6 + 0.4 * n);
