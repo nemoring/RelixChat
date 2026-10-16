@@ -219,6 +219,13 @@ func _footstep(sprint: bool) -> void:
 			pitch = 1.15
 	var vol := -14.0 if crouching else (-4.0 if sprint else -9.0)
 	Sfx.play_3d(sound, global_position + Vector3.UP * 0.05, vol, pitch * randf_range(0.92, 1.08), 18.0)
+	if not Sfx.recent.is_empty():
+		Sfx.recent.pop_back()
+	# Старый пол в коридоре и подсобке иногда скрипит.
+	if current_room in ["corridor", "utility", "tech"] and randf() < 0.18:
+		Sfx.play_3d("creak", global_position, -18.0, randf_range(0.45, 0.6), 12.0)
+		if GameWorld.instance:
+			GameWorld.instance.emit_noise(global_position, 0.35, "player")
 	if GameWorld.instance:
 		GameWorld.instance.emit_noise(global_position, 0.1 if crouching else (0.8 if sprint else 0.3), "player")
 

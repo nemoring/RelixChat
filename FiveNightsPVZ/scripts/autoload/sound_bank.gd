@@ -8,6 +8,14 @@ extends Node
 const RATE := 22050
 
 var _cache := {}
+## Недавние значимые звуки: [имя, позиция, мс] — для механики «прислушаться».
+var recent: Array = []
+const AUDIBLE_NAMES := {
+	"step": "Шаги", "step_heavy": "Тяжёлые шаги", "step_soft": "Тихие шаги", "breath": "Дыхание",
+	"rustle": "Шорох коробок", "creak": "Скрип", "whisper": "Шёпот", "knock": "Стук", "thud": "Глухой удар",
+	"door_open": "Дверь", "door_close": "Дверь", "glass_tap": "Стук по стеклу", "cloth": "Шорох одежды",
+	"shutter": "Рольставня", "bell": "Звонок на стойке", "phone": "Телефон", "printer": "Принтер", "relay": "Щелчок реле",
+}
 var _rng := RandomNumberGenerator.new()
 ## Звуки, которые нужно сгенерировать заранее (на загрузочном экране).
 const WARMUP := [
@@ -79,6 +87,10 @@ func play_3d(sound_name: String, pos: Vector3, volume_db := 0.0, pitch := 1.0, m
 	apply_occlusion(p)
 	p.play()
 	p.finished.connect(p.queue_free)
+	if AUDIBLE_NAMES.has(sound_name):
+		recent.append([sound_name, pos, Time.get_ticks_msec()])
+		if recent.size() > 24:
+			recent.pop_front()
 	return p
 
 

@@ -19,6 +19,7 @@ func _ready() -> void:
 		p.rotation_degrees.y = float(a[4])
 		p.head.rotation_degrees.x = float(a[5])
 		if a.size() > 8 and a[8] == "flash":
+			GameWorld.instance.level.lighting.set_switch("warehouse", false)
 			p.toggle_flashlight()
 		if a.size() > 8 and a[8] == "desk":
 			GameWorld.instance.open_desk()

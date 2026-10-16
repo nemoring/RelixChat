@@ -137,7 +137,7 @@ func _process(delta: float) -> void:
 	if p.hiding_in and show_ui:
 		held.text = "Вы прячетесь %s. [E] — выйти" % p.hiding_in.spot_name
 	if p.listening and show_ui:
-		held.text = "Прислушиваетесь…"
+		held.text = "Прислушиваетесь… " + _listen_hint(p)
 	clock.text = "%s   Ночь %s" % [world.night.clock_text(), "★" if GameState.is_custom_night else str(world.night_index)]
 	# Фонарик.
 	_battery_show_t = maxf(0.0, _battery_show_t - delta)
@@ -153,6 +153,30 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("tasks"):
 		_tasks_expanded = not _tasks_expanded
 		_refresh_tasks()
+
+
+## Направление последнего значимого звука (кроме собственных шагов).
+func _listen_hint(p: Player) -> String:
+	var now := Time.get_ticks_msec()
+	for i in range(Sfx.recent.size() - 1, -1, -1):
+		var r: Array = Sfx.recent[i]
+		if now - int(r[2]) > 5000:
+			break
+		var pos: Vector3 = r[1]
+		var d := pos.distance_to(p.global_position)
+		if d < 1.2 or d > 18.0:
+			continue
+		var to := pos - p.global_position
+		var local := p.global_basis.inverse() * to
+		var dir := "впереди"
+		if absf(local.x) > absf(local.z):
+			dir = "справа" if local.x > 0 else "слева"
+		elif local.z > 0:
+			dir = "сзади"
+		var wall := "" if p.has_los(pos + Vector3.UP * 0.2) else ", за стеной"
+		var dist := "рядом" if d < 4.0 else ("недалеко" if d < 9.0 else "далеко")
+		return "%s — %s, %s%s" % [Sfx.AUDIBLE_NAMES[r[0]], dir, dist, wall]
+	return "тишина"
 
 
 func _prompt_text(p: Player) -> String:

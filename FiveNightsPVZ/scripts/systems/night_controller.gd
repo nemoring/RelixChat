@@ -93,7 +93,21 @@ func _process(delta: float) -> void:
 
 # ------------------------------------------------------------------ Сценарий
 
+const TUTORIAL := {
+	"intake": "Поступление: коробки на поддоне у рольставни (склад). Отнесите каждую к сканеру на стойке, затем — в указанную ячейку.",
+	"client": "У стойки клиент. Сядьте за компьютер → «Заказы» → откройте карточку, найдите коробку в ячейке и положите на стойку.",
+	"woman_request": "Голос из примерочной. Пакеты с размерами висят на вешалах в складе у восточной стены. Передайте через шторку.",
+	"real_task": "Новое письмо с заданием обхода. Метки обхода — синие таблички на стенах.",
+	"breaker": "Выбило автомат. Электрощиток — в подсобке, в конце служебного коридора.",
+	"phone": "Звонит телефон на стене рабочего места. Он отключён много лет.",
+	"faceless_outside": "Кто-то стоит за стеклянной дверью. Магнитный замок включён — он не войдёт. Не отключайте замок.",
+}
+
+
 func run_beat(kind: String, param) -> void:
+	if night == 1 and not GameState.is_custom_night and TUTORIAL.has(kind):
+		var hint: String = TUTORIAL[kind]
+		get_tree().create_timer(2.5).timeout.connect(func(): world.hud_message(hint, 8.0))
 	match kind:
 		"mail_intro":
 			var m := Story.intro_mail(night if not GameState.is_custom_night else 6, GameState.player_name())
