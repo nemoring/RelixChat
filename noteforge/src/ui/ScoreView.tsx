@@ -12,6 +12,7 @@ import { getStaff, timeline, clefAt, staffCount } from '../model/query';
 import { clefBottomLine } from '../model/pitch';
 import { Frac, ZERO, cmp } from '../model/fraction';
 import * as A from '../state/actions';
+import { attachPlayback, invalidatePlaybackGeometry } from './playbackOverlay';
 import type { Score } from '../model/types';
 
 interface RenderInfo {
@@ -39,6 +40,7 @@ const PageBox = memo(function PageBox(props: { page: number; svg: string | null;
     <div className={`page${props.stale ? ' stale' : ''}`} data-page={props.page} style={{ width: props.width, height: props.height }}>
       {props.svg ? <div className="svg-host" dangerouslySetInnerHTML={{ __html: props.svg }} /> : <div className="page-loading">Гравировка…</div>}
       <div className="overlay" />
+      <div className="play-overlay" />
     </div>
   );
 });
@@ -153,6 +155,10 @@ export function ScoreView() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [render, cacheVersion, scale, pwMm, phMm, view.mode]);
+
+  // ── playback cursor ──
+  useEffect(() => (scrollRef.current ? attachPlayback(scrollRef.current) : undefined), []);
+  useLayoutEffect(() => invalidatePlaybackGeometry(), [pages, view.zoom]);
 
   // ── selection highlight & cursor overlays ──
   useLayoutEffect(() => {

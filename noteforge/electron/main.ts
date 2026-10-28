@@ -3,8 +3,9 @@
  * writes + .bak backups) and the app:// protocol that serves the built UI.
  * Nothing here talks to the network.
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from 'electron';
 import fs from 'node:fs/promises';
+import type { FileHandle } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -41,6 +42,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       spellcheck: false,
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
   win.once('ready-to-show', () => win?.show());
@@ -76,6 +78,9 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(file).toString());
   });
   Menu.setApplicationMenu(null);
+  // Web MIDI (MIDI keyboards / external synths) needs an explicit permission in Electron.
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'midi' || permission === 'midiSysex'));
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'midi' || permission === 'midiSysex');
   createWindow();
 });
 
@@ -119,6 +124,66 @@ ipcMain.handle('project:save', async (_e, p: string | null, content: string, sug
   }
   await writeProject(target, content);
   return target;
+});
+
+async function askSavePath(name: string, filterName: string, ext: string): Promise<string | null> {
+  if (!win) return null;
+  const r = await dialog.showSaveDialog(win, { defaultPath: name, filters: [{ name: filterName, extensions: [ext] }] });
+  if (r.canceled || !r.filePath) return null;
+  return r.filePath.toLowerCase().endsWith(`.${ext}`) ? r.filePath : `${r.filePath}.${ext}`;
+}
+
+ipcMain.handle('file:saveBinary', async (_e, name: string, filterName: string, ext: string, data: Uint8Array) => {
+  const p = await askSavePath(name, filterName, ext);
+  if (!p) return null;
+  await fs.writeFile(p, Buffer.from(data));
+  return p;
+});
+
+ipcMain.handle('file:saveText', async (_e, name: string, filterName: string, ext: string, content: string) => {
+  const p = await askSavePath(name, filterName, ext);
+  if (!p) return null;
+  await fs.writeFile(p, content, 'utf8');
+  return p;
+});
+
+const writers = new Map<string, { fh: FileHandle; path: string }>();
+ipcMain.handle('file:createWriter', async (_e, name: string, filterName: string, ext: string) => {
+  const p = await askSavePath(name, filterName, ext);
+  if (!p) return null;
+  const id = `w${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+  writers.set(id, { fh: await fs.open(`${p}.part`, 'w'), path: p });
+  return { id, path: p };
+});
+ipcMain.handle('file:writeChunk', async (_e, id: string, data: Uint8Array) => {
+  const w = writers.get(id);
+  if (!w) throw new Error('Файл экспорта закрыт');
+  await w.fh.write(Buffer.from(data));
+});
+ipcMain.handle('file:closeWriter', async (_e, id: string, abort: boolean) => {
+  const w = writers.get(id);
+  if (!w) return;
+  writers.delete(id);
+  await w.fh.close();
+  if (abort) await fs.rm(`${w.path}.part`, { force: true });
+  else await fs.rename(`${w.path}.part`, w.path);
+});
+
+ipcMain.handle('file:openBinary', async (_e, filterName: string, exts: string[]) => {
+  if (!win) return null;
+  const r = await dialog.showOpenDialog(win, { filters: [{ name: filterName, extensions: exts }], properties: ['openFile'] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const p = r.filePaths[0];
+  const buf = await fs.readFile(p);
+  return { name: path.basename(p), path: p, data: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
+});
+
+ipcMain.handle('file:openText', async (_e, filterName: string, exts: string[]) => {
+  if (!win) return null;
+  const r = await dialog.showOpenDialog(win, { filters: [{ name: filterName, extensions: exts }], properties: ['openFile'] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const p = r.filePaths[0];
+  return { name: path.basename(p), path: p, content: await fs.readFile(p, 'utf8') };
 });
 
 ipcMain.on('doc:state', (_e, title: string, isDirty: boolean) => {

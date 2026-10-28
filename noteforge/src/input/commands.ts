@@ -5,6 +5,8 @@
  * always the one that actually works.
  */
 import * as A from '../state/actions';
+import * as P from '../state/playback';
+import { player } from '../playback/player';
 import { getState } from '../state/store';
 import type { DurBase, Step } from '../model/types';
 
@@ -90,6 +92,20 @@ const list: Command[] = [
   { id: 'view.page', label: 'Постраничный вид', keys: [], group: 'Вид', run: () => A.setViewMode('page') },
   { id: 'view.continuous', label: 'Непрерывный вид', keys: [], group: 'Вид', run: () => A.setViewMode('continuous') },
   { id: 'view.palette', label: 'Палитра символов', keys: ['F9'], group: 'Вид', run: A.togglePalette },
+  // Playback
+  { id: 'play.toggle', label: 'Воспроизведение / пауза', keys: ['Space'], group: 'Воспроизведение', run: () => void P.playPause() },
+  { id: 'play.stop', label: 'Стоп', keys: ['Shift+Space'], group: 'Воспроизведение', run: P.stop },
+  { id: 'play.restart', label: 'С начала', keys: ['Home'], group: 'Воспроизведение', run: () => void P.restart() },
+  { id: 'play.selection', label: 'Воспроизвести выделенное', keys: ['Ctrl+Space'], group: 'Воспроизведение', run: () => void P.playFromSelection() },
+  { id: 'play.loop', label: 'Повтор (цикл) выделенного фрагмента', keys: ['Ctrl+L'], group: 'Воспроизведение', run: P.toggleLoop },
+  { id: 'play.metronome', label: 'Метроном', keys: ['Ctrl+M'], group: 'Воспроизведение', run: P.toggleMetronome },
+  { id: 'play.faster', label: 'Быстрее (+5 %)', keys: ['Ctrl+]'], group: 'Воспроизведение', run: () => P.changeSpeed(0.05) },
+  { id: 'play.slower', label: 'Медленнее (−5 %)', keys: ['Ctrl+['], group: 'Воспроизведение', run: () => P.changeSpeed(-0.05) },
+  { id: 'play.speed100', label: 'Скорость 100 %', keys: [], group: 'Воспроизведение', run: () => player.setSpeed(1) },
+  { id: 'play.mixer', label: 'Микшер…', keys: ['F10'], group: 'Воспроизведение', run: () => A.openDialog('mixer') },
+  { id: 'play.soundfont', label: 'Загрузить SoundFont (.sf2)…', keys: [], group: 'Воспроизведение', run: () => void P.chooseSoundFont() },
+  { id: 'export.midi', label: 'Экспорт в MIDI…', keys: [], group: 'Файл', run: () => void P.exportMidi() },
+  { id: 'export.wav', label: 'Экспорт в WAV…', keys: [], group: 'Файл', run: () => void P.exportWav() },
   // Tools / help
   { id: 'tools.stats', label: 'Статистика произведения…', keys: [], group: 'Инструменты', run: () => A.openDialog('stats') },
   { id: 'help.shortcuts', label: 'Горячие клавиши', keys: ['F1'], group: 'Справка', run: () => A.openDialog('shortcuts') },
@@ -118,6 +134,8 @@ export function eventToShortcut(e: KeyboardEvent): string | null {
   if (/^Key[A-Z]$/.test(e.code)) key = e.code.slice(3);
   else if (/^Digit\d$/.test(e.code)) key = e.code.slice(5);
   else if (e.code === 'Period' || e.code === 'NumpadDecimal') key = '.';
+  else if (e.code === 'BracketLeft') key = '[';
+  else if (e.code === 'BracketRight') key = ']';
   else if (e.code === 'Equal') key = e.shiftKey ? '+' : '=';
   else if (e.code === 'NumpadAdd') key = '+';
   else if (e.code === 'Minus' || e.code === 'NumpadSubtract') key = '-';

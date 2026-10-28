@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { commands, runCommand } from '../input/commands';
 import { useStore } from '../state/store';
+import { player } from '../playback/player';
 
 type Item = string | '-';
 const MENUS: { title: string; items: Item[] }[] = [
-  { title: 'Файл', items: ['file.new', 'file.open', '-', 'file.save', 'file.saveAs', '-', 'file.info'] },
+  { title: 'Файл', items: ['file.new', 'file.open', '-', 'file.save', 'file.saveAs', '-', 'export.midi', 'export.wav', '-', 'file.info'] },
   {
     title: 'Правка',
     items: ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.delete', '-', 'edit.selectAll', '-', 'edit.up', 'edit.down', 'edit.octUp', 'edit.octDown', '-', 'edit.goto'],
@@ -12,6 +13,7 @@ const MENUS: { title: string; items: Item[] }[] = [
   { title: 'Вид', items: ['view.zoomIn', 'view.zoomOut', 'view.zoom100', '-', 'view.page', 'view.continuous', '-', 'view.palette'] },
   { title: 'Вставка', items: ['input.toggle', '-', 'measure.append', 'measure.insert', 'measure.many', 'measure.delete'] },
   { title: 'Формат', items: ['format.timeSig', '-', 'acc.sharp', 'acc.flat', 'acc.natural', 'acc.dsharp', 'acc.dflat', '-', 'format.page'] },
+  { title: 'Воспроизведение', items: ['play.toggle', 'play.stop', 'play.restart', 'play.selection', '-', 'play.loop', 'play.metronome', '-', 'play.faster', 'play.slower', 'play.speed100', '-', 'play.mixer', 'play.soundfont'] },
   { title: 'Инструменты', items: ['tools.stats'] },
   { title: 'Справка', items: ['help.shortcuts', 'help.about'] },
 ];
@@ -52,7 +54,11 @@ export function MenuBar() {
                 if (id === '-') return <div key={k} className="menu-sep" />;
                 const c = commands.get(id)!;
                 const disabled = c.enabled ? !c.enabled() : false;
-                const checked = (id === 'view.page' && viewMode === 'page') || (id === 'view.continuous' && viewMode === 'continuous');
+                const checked =
+                  (id === 'view.page' && viewMode === 'page') ||
+                  (id === 'view.continuous' && viewMode === 'continuous') ||
+                  (id === 'play.loop' && player.state.loop) ||
+                  (id === 'play.metronome' && player.state.metronome);
                 return (
                   <button
                     key={id}

@@ -4,7 +4,8 @@ import { Toolbar } from './ui/Toolbar';
 import { Palette } from './ui/Palette';
 import { ScoreView } from './ui/ScoreView';
 import { StatusBar } from './ui/StatusBar';
-import { Dialogs } from './ui/Dialogs';
+import { Dialogs, ExportProgress } from './ui/Dialogs';
+import { Transport } from './ui/Transport';
 import { handleKeyDown } from './input/commands';
 import { useStore, getState, isDirty, subscribe } from './state/store';
 import * as A from './state/actions';
@@ -68,8 +69,10 @@ export function App() {
         {showPalette && <Palette />}
         <ScoreView />
       </div>
+      <Transport />
       <StatusBar />
       <Dialogs />
+      <ExportProgress />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { createPianoScore, type NewScoreOptions } from '../model/factory';
 import { parseProject, serializeProject } from '../model/serialize';
 import { commit, getState, setState, undo, redo, loadDocument, isDirty, type Selection, type Cursor, type AppState } from './store';
 import { platform } from '../platform';
+import { previewSelection } from './playback';
 
 export { undo, redo };
 
@@ -82,6 +83,7 @@ function writeAtCursor(label: string, tpl: E.Template, cursorOverride?: Cursor):
     const cursor: Cursor = { staff: c.staff, measure: r.endMeasure, voice: c.voice, time: r.endTime };
     return { selection: selectionFromWrite(c.staff, c.voice, r, d), cursor, ...reveal(r.endMeasure) };
   });
+  if (tpl.type === 'chord') previewSelection();
 }
 
 /** Letter key A–G. With addToChord the pitch is added above the selected chord. */
@@ -139,6 +141,7 @@ function addPitch(p: Pitch): void {
     const noteId = E.addPitchToEvent(d, sel.staff, sel.measure, sel.voice, sel.eventId, p);
     return { selection: { kind: 'event', staff: sel.staff, measure: sel.measure, voice: sel.voice, eventId: sel.eventId, noteId } };
   });
+  previewSelection();
 }
 
 export function enterRest(): void {
@@ -251,6 +254,7 @@ export function transposeSelection(semitones: number): void {
     });
     sortSelectedChords(d);
   });
+  previewSelection();
 }
 
 export function setAlter(alter: number): void {
@@ -291,6 +295,12 @@ export function toggleTie(): void {
 
 export function selectElement(ref: { staff: number; measure: number; voice: number; eventId: string; noteId?: string }): void {
   setState({ selection: { kind: 'event', ...ref } });
+  previewSelection();
+}
+
+/** Scrolls the score so that measure `m` is visible. */
+export function revealMeasure(m: number): void {
+  setState(reveal(m));
 }
 
 export function selectMeasure(staff: number, measure: number, extend: boolean): void {

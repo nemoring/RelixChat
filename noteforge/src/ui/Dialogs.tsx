@@ -6,6 +6,8 @@ import { keyName } from '../model/pitch';
 import { computeStats, formatDuration } from '../model/stats';
 import { APP_VERSION } from '../model/serialize';
 import type { PageLayout } from '../model/types';
+import { Mixer } from './Transport';
+import * as P from '../state/playback';
 
 function Modal({ title, children, onSubmit, submitLabel = 'OK', wide }: { title: string; children: React.ReactNode; onSubmit?: () => void; submitLabel?: string; wide?: boolean }) {
   const ref = useRef<HTMLFormElement>(null);
@@ -370,6 +372,29 @@ function MessageDialog() {
   );
 }
 
+export function ExportProgress() {
+  const p = useStore((s) => s.exportProgress);
+  if (!p) return null;
+  return (
+    <div className="modal-backdrop">
+      <div className="modal">
+        <h2>{p.text}</h2>
+        <div className="modal-body">
+          <div className="progress">
+            <div className="progress-bar" style={{ width: `${Math.round((p.progress ?? 0) * 100)}%` }} />
+          </div>
+          <p className="hint">{p.progress !== null ? `${Math.round(p.progress * 100)} %` : 'Подготовка…'}</p>
+        </div>
+        <div className="modal-actions">
+          <button type="button" onClick={P.cancelExport}>
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Dialogs() {
   const kind = useStore((s) => s.dialog.kind);
   switch (kind) {
@@ -393,6 +418,14 @@ export function Dialogs() {
       return <AboutDialog />;
     case 'message':
       return <MessageDialog />;
+    case 'mixer':
+      return (
+        <Modal title="Микшер">
+          <div className="mixer inline">
+            <Mixer onClose={() => {}} embedded />
+          </div>
+        </Modal>
+      );
     default:
       return null;
   }

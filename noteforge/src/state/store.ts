@@ -38,7 +38,7 @@ export interface ViewState {
 }
 
 export interface Dialog {
-  kind: 'none' | 'scoreInfo' | 'newScore' | 'timeSig' | 'measures' | 'gotoMeasure' | 'stats' | 'shortcuts' | 'about' | 'pageSetup' | 'message';
+  kind: 'none' | 'scoreInfo' | 'newScore' | 'timeSig' | 'measures' | 'gotoMeasure' | 'stats' | 'shortcuts' | 'about' | 'pageSetup' | 'message' | 'mixer';
   message?: { title: string; text: string };
 }
 
@@ -61,6 +61,8 @@ export interface AppState {
   status: string;
   /** Measure index the score view should scroll to (incremented token forces re-scroll). */
   reveal: { measure: number; token: number } | null;
+  /** Long-running export in progress (shown as a modal progress bar). */
+  exportProgress: { text: string; progress: number | null } | null;
 }
 
 const HISTORY_LIMIT = 500;
@@ -80,6 +82,7 @@ function initialState(): AppState {
     dialog: { kind: 'none' },
     status: 'Готово',
     reveal: null,
+    exportProgress: null,
   };
 }
 
