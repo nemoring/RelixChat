@@ -64,7 +64,10 @@ public final class SaveManager implements Runnable {
         o.writeInt(sequence);
         o.writeInt(payload.length);
         o.write(payload);
-        o.writeInt(crc32(payload, 0, payload.length));
+        o.flush();
+        byte[] head = bo.toByteArray();
+        // CRC covers sequence, length and payload
+        o.writeInt(crc32(head, 4, head.length - 4));
         o.flush();
         return bo.toByteArray();
     }
@@ -87,7 +90,7 @@ public final class SaveManager implements Runnable {
             byte[] p = new byte[len];
             in.readFully(p);
             int crc = in.readInt();
-            if (crc != crc32(p, 0, len)) {
+            if (crc != crc32(blob, 4, blob.length - 8)) {
                 return null;
             }
             seqOut[0] = s;

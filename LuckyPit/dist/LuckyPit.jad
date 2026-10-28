@@ -5,7 +5,7 @@ MIDlet-Version: 1.0.0
 MIDlet-Description: Roguelike slot machine. Virtual coins only.
 MIDlet-Icon: /icon.png
 MIDlet-Jar-URL: LuckyPit.jar
-MIDlet-Jar-Size: 320384
+MIDlet-Jar-Size: 320631
 MicroEdition-Profile: MIDP-2.0
 MicroEdition-Configuration: CLDC-1.1
 Nokia-MIDlet-Category: Game

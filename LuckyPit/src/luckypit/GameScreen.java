@@ -33,6 +33,7 @@ public final class GameScreen extends Screen {
     private int lampMode;
     private int glintX = -60;
     private int endDelay;
+    private boolean tease;
     private String[] detailLines;
     private final int[] weightsTmp = new int[Symbol.COUNT];
 
@@ -108,6 +109,10 @@ public final class GameScreen extends Screen {
             stopAt[i] = base + i * gap;
             stopped[i] = false;
         }
+        tease = anticipation(g);
+        if (tease) {
+            stopAt[2] += mm.stats.fastReels ? 350 : 700;
+        }
         leverT = 0;
         st = ST_SPIN;
         t = 0;
@@ -115,6 +120,23 @@ public final class GameScreen extends Screen {
         lcd2 = null;
         lampMode = 1;
         mm.sfx(SoundManager.SPIN);
+    }
+
+    /** True when the first two reels already promise a line (third reel slows down). */
+    private boolean anticipation(GameState g) {
+        for (int li = 0; li < 7; li++) {
+            if (!g.lineActive(li)) {
+                continue;
+            }
+            int a = res.start[SlotMachine.LINES[li][0]], b = res.start[SlotMachine.LINES[li][1]];
+            if (a == Symbol.SKULL || b == Symbol.SKULL) {
+                continue;
+            }
+            if (a == b || a == Symbol.EYE || b == Symbol.EYE) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void hurry() {
@@ -201,6 +223,11 @@ public final class GameScreen extends Screen {
                         reels[i].stop(res.start[i], res.start[3 + i], res.start[6 + i]);
                     }
                 }
+                if (tease && stopped[1] && !stopped[2] && reels[1].idle()) {
+                    lcd = "!!!";
+                    lcdColor = PixelFont.GOLD;
+                    lampMode = 2;
+                }
                 boolean all = true;
                 for (int i = 0; i < 3; i++) {
                     if (reels[i].update(dt)) {
@@ -266,6 +293,13 @@ public final class GameScreen extends Screen {
                 }
                 break;
             }
+            case ST_IDLE:
+                // a run reloaded right after its last spin still has to end the round
+                if (g.phase == GameState.PH_PLAY && g.spinsLeft <= 0) {
+                    st = ST_END;
+                    endDelay = 0;
+                }
+                break;
             case ST_END:
                 endDelay += dt;
                 if (endDelay > 250) {
