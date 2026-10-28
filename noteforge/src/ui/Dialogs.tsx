@@ -5,8 +5,8 @@ import { commands } from '../input/commands';
 import { keyName } from '../model/pitch';
 import { computeStats, formatDuration } from '../model/stats';
 import { APP_VERSION } from '../model/serialize';
-import type { PageLayout } from '../model/types';
 import { Mixer } from './Transport';
+import { PrintPreview } from './PrintPreview';
 import * as P from '../state/playback';
 import * as N from '../state/notation';
 import { selectedMeasure } from '../state/actions';
@@ -284,48 +284,6 @@ function StatsDialog() {
   );
 }
 
-function PageSetupDialog() {
-  const [layout, setLayout] = useState<PageLayout>(structuredClone(getState().score.layout));
-  const setMargin = (k: keyof PageLayout['margins']) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setLayout({ ...layout, margins: { ...layout.margins, [k]: Math.max(0, Math.min(80, Number(e.target.value))) } });
-  return (
-    <Modal
-      title="Параметры страницы"
-      onSubmit={() => {
-        A.closeDialog();
-        A.updateScore('Параметры страницы', (d) => {
-          d.layout = { ...layout, staffScale: Math.max(40, Math.min(200, layout.staffScale)) };
-        });
-      }}
-    >
-      <div className="row">
-        <Field label="Формат">
-          <select value={layout.size} onChange={(e) => setLayout({ ...layout, size: e.target.value as PageLayout['size'] })}>
-            <option value="A4">A4 (210 × 297 мм)</option>
-            <option value="A3">A3 (297 × 420 мм)</option>
-            <option value="Letter">Letter (216 × 279 мм)</option>
-          </select>
-        </Field>
-        <Field label="Ориентация">
-          <select value={layout.orientation} onChange={(e) => setLayout({ ...layout, orientation: e.target.value as PageLayout['orientation'] })}>
-            <option value="portrait">Книжная</option>
-            <option value="landscape">Альбомная</option>
-          </select>
-        </Field>
-      </div>
-      <div className="row">
-        <Field label="Поле сверху, мм"><input type="number" value={layout.margins.top} onChange={setMargin('top')} /></Field>
-        <Field label="Снизу, мм"><input type="number" value={layout.margins.bottom} onChange={setMargin('bottom')} /></Field>
-        <Field label="Слева, мм"><input type="number" value={layout.margins.left} onChange={setMargin('left')} /></Field>
-        <Field label="Справа, мм"><input type="number" value={layout.margins.right} onChange={setMargin('right')} /></Field>
-      </div>
-      <Field label="Размер нотного стана, %">
-        <input type="number" min={40} max={200} value={layout.staffScale} onChange={(e) => setLayout({ ...layout, staffScale: Number(e.target.value) })} />
-      </Field>
-    </Modal>
-  );
-}
-
 function ShortcutsDialog() {
   const groups = new Map<string, { label: string; keys: string[] }[]>();
   for (const c of commands.values()) {
@@ -360,7 +318,7 @@ function AboutDialog() {
         <b>NoteForge {APP_VERSION}</b> — редактор фортепианных партитур.
       </p>
       <p>Гравировка нот: Verovio (LGPL). Формат проекта: .nfg (JSON).</p>
-      <p className="hint">Этап 1: редактирование, сохранение, отмена. Воспроизведение, печать/PDF и MusicXML — следующие этапы.</p>
+      <p className="hint">Звук: банк GeneralUser GS © S. Christian Collins (свободная лицензия, см. soundfonts/GeneralUser-GS-LICENSE.txt).</p>
     </Modal>
   );
 }
@@ -564,14 +522,14 @@ export function Dialogs() {
       return <GotoDialog />;
     case 'stats':
       return <StatsDialog />;
-    case 'pageSetup':
-      return <PageSetupDialog />;
     case 'shortcuts':
       return <ShortcutsDialog />;
     case 'about':
       return <AboutDialog />;
     case 'message':
       return <MessageDialog />;
+    case 'preview':
+      return <PrintPreview />;
     case 'tempo':
       return <TempoDialog />;
     case 'tuplet':

@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('noteforge', {
   openBinary: (filterName: string, exts: string[]) => ipcRenderer.invoke('file:openBinary', filterName, exts),
   openText: (filterName: string, exts: string[]) => ipcRenderer.invoke('file:openText', filterName, exts),
   saveText: (name: string, filterName: string, ext: string, content: string) => ipcRenderer.invoke('file:saveText', name, filterName, ext, content),
+  printBegin: (w: number, h: number, title: string) => ipcRenderer.invoke('print:begin', w, h, title),
+  printPage: (job: string, svg: string) => ipcRenderer.invoke('print:page', job, svg),
+  printFinish: (job: string, action: 'pdf' | 'print', name: string) => ipcRenderer.invoke('print:finish', job, action, name),
   setDocumentState: (title: string, dirty: boolean) => ipcRenderer.send('doc:state', title, dirty),
   getLaunchFile: () => ipcRenderer.invoke('app:launchFile'),
   onCloseRequest: (cb: () => void) => {

@@ -26,6 +26,10 @@ export interface PlatformApi {
   /** Opens a text file chosen by the user. */
   openText(filterName: string, exts: string[]): Promise<{ name: string; path: string; content: string } | null>;
   saveText(suggestedName: string, filterName: string, ext: string, content: string): Promise<string | null>;
+  /** Print pipeline (see src/print/print.ts). */
+  printBegin(widthMm: number, heightMm: number, title: string): Promise<string>;
+  printPage(job: string, svg: string): Promise<void>;
+  printFinish(job: string, action: 'pdf' | 'print', suggestedName: string): Promise<string | null>;
   getLaunchFile(): Promise<string | null>;
   onCloseRequest(cb: () => void): void;
   confirmClose(): void;
@@ -39,6 +43,19 @@ declare global {
 }
 
 const writers = new Map<string, { name: string; parts: BlobPart[] }>();
+const printJobs = new Map<string, { w: number; h: number; title: string; pages: string[] }>();
+
+/** HTML document with one vector SVG per printed page. */
+export function printHtml(wMm: number, hMm: number, title: string, pages: string[]): string {
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+@page { size: ${wMm}mm ${hMm}mm; margin: 0 }
+html, body { margin: 0; padding: 0; background: #fff }
+.pg { width: ${wMm}mm; height: ${hMm}mm; overflow: hidden; page-break-after: always; break-after: page }
+.pg:last-child { page-break-after: auto; break-after: auto }
+.pg svg { width: 100%; height: 100%; display: block }
+</style></head><body>${pages.map((p) => `<div class="pg">${p}</div>`).join('')}</body></html>`;
+}
 
 function download(blob: Blob, name: string) {
   const a = document.createElement('a');
@@ -111,6 +128,27 @@ const browserFallback: PlatformApi = {
   },
   setDocumentState: (title, dirty) => {
     document.title = `${dirty ? '• ' : ''}${title} — NoteForge`;
+  },
+  printBegin: async (w, h, title) => {
+    const id = `p${Date.now()}`;
+    printJobs.set(id, { w, h, title, pages: [] });
+    return id;
+  },
+  printPage: async (job, svg) => {
+    printJobs.get(job)?.pages.push(svg);
+  },
+  printFinish: async (job) => {
+    const j = printJobs.get(job);
+    printJobs.delete(job);
+    if (!j) return null;
+    // Browser fallback: open the pages in a window and use the browser's print dialog (can save as PDF).
+    const w = window.open('', '_blank');
+    if (!w) return null;
+    w.document.write(printHtml(j.w, j.h, j.title, j.pages));
+    w.document.close();
+    w.focus();
+    w.print();
+    return 'print';
   },
   getLaunchFile: async () => null,
   onCloseRequest: () => {},

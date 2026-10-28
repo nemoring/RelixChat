@@ -517,3 +517,48 @@ function noteXml(note: Note, accid: string | null | undefined, attrs: string, sh
   const a = attrs ? ` ${attrs}` : '';
   return inner ? `<note xml:id="${note.id}"${a} ${pitch}${acc}>${inner}</note>` : `<note xml:id="${note.id}"${a} ${pitch}${acc}/>`;
 }
+
+/** Accidental display decisions for every measure (shared with MusicXML export). */
+export function accidentalResolver(score: Score): (m: number) => Map<string, string | null> {
+  const keys = effectiveKeys(score);
+  const { targets } = resolveTies(score);
+  const { shifts } = octaveShifts(score);
+  return (m) => accidentalsForMeasure(score, m, keys[m], targets, shifts);
+}
+
+/** Tie targets (notes that continue a tie) for MusicXML tie stops. */
+export function tieTargets(score: Score): Set<string> {
+  return resolveTies(score).targets;
+}
+
+/** Beam begin/continue/end per event of a layer, exactly as engraved. */
+export function beamStates(events: VoiceEvent[], ts: TimeSig): Map<string, 'begin' | 'continue' | 'end'> {
+  const out = new Map<string, 'begin' | 'continue' | 'end'>();
+  const mark = (group: VoiceEvent[]) => {
+    if (group.length < 2) return;
+    group.forEach((ev, i) => out.set(ev.id, i === 0 ? 'begin' : i === group.length - 1 ? 'end' : 'continue'));
+  };
+  let run: { ev: VoiceEvent; start: Frac }[] = [];
+  const flushRun = () => {
+    for (const g of beamGroups(run, ts)) mark(g.map((i) => run[i].ev));
+    run = [];
+  };
+  for (const b of blocksOf(events)) {
+    if (!b.tuplet) {
+      run.push({ ev: b.events[0], start: b.start });
+      continue;
+    }
+    flushRun();
+    let group: VoiceEvent[] = [];
+    for (const ev of b.events) {
+      if (beamable(ev) && !(ev.type === 'chord' && ev.beam === 'break' && group.length)) group.push(ev);
+      else {
+        mark(group);
+        group = beamable(ev) ? [ev] : [];
+      }
+    }
+    mark(group);
+  }
+  flushRun();
+  return out;
+}

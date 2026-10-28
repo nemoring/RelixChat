@@ -9,6 +9,7 @@ import type { FileHandle } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import os from 'node:os';
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DIST = path.join(__dirname, '..', 'dist');
@@ -184,6 +185,72 @@ ipcMain.handle('file:openText', async (_e, filterName: string, exts: string[]) =
   if (r.canceled || !r.filePaths[0]) return null;
   const p = r.filePaths[0];
   return { name: path.basename(p), path: p, content: await fs.readFile(p, 'utf8') };
+});
+
+// ───────────── printing / PDF ─────────────
+
+interface PrintJob {
+  file: string;
+  widthMm: number;
+  heightMm: number;
+  fh: FileHandle;
+}
+const printJobs = new Map<string, PrintJob>();
+
+ipcMain.handle('print:begin', async (_e, widthMm: number, heightMm: number, title: string) => {
+  const id = `job${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+  const file = path.join(os.tmpdir(), `noteforge-print-${id}.html`);
+  const fh = await fs.open(file, 'w');
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  await fh.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+@page { size: ${widthMm}mm ${heightMm}mm; margin: 0 }
+html, body { margin: 0; padding: 0; background: #fff }
+.pg { width: ${widthMm}mm; height: ${heightMm}mm; overflow: hidden; page-break-after: always; break-after: page }
+.pg:last-child { page-break-after: auto; break-after: auto }
+.pg svg { width: 100%; height: 100%; display: block }
+</style></head><body>`);
+  printJobs.set(id, { file, widthMm, heightMm, fh });
+  return id;
+});
+
+ipcMain.handle('print:page', async (_e, id: string, svg: string) => {
+  const j = printJobs.get(id);
+  if (!j) throw new Error('Задание печати не найдено');
+  await j.fh.write(`<div class="pg">${svg}</div>`);
+});
+
+ipcMain.handle('print:finish', async (_e, id: string, action: 'pdf' | 'print', suggestedName: string) => {
+  const j = printJobs.get(id);
+  if (!j) throw new Error('Задание печати не найдено');
+  printJobs.delete(id);
+  await j.fh.write('</body></html>');
+  await j.fh.close();
+  const pw = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
+  try {
+    await pw.loadFile(j.file);
+    const inch = (mm: number) => mm / 25.4;
+    if (action === 'pdf') {
+      const target = await askSavePath(suggestedName, 'PDF', 'pdf');
+      if (!target) return null;
+      const data = await pw.webContents.printToPDF({
+        pageSize: { width: inch(j.widthMm), height: inch(j.heightMm) },
+        margins: { marginType: 'none' },
+        printBackground: true,
+        preferCSSPageSize: true,
+      });
+      await fs.writeFile(target, data);
+      return target;
+    }
+    return await new Promise<string | null>((resolve, reject) => {
+      pw.webContents.print(
+        { silent: false, printBackground: true, margins: { marginType: 'none' }, pageSize: { width: Math.round(j.widthMm * 1000), height: Math.round(j.heightMm * 1000) } },
+        (ok, reason) => (ok ? resolve('printed') : reason === 'cancelled' || reason === 'Print job canceled' ? resolve(null) : reject(new Error(reason))),
+      );
+    });
+  } finally {
+    pw.destroy();
+    await fs.rm(j.file, { force: true });
+  }
 });
 
 ipcMain.on('doc:state', (_e, title: string, isDirty: boolean) => {

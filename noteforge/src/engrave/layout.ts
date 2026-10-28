@@ -15,7 +15,7 @@ export function pageSizeMm(layout: PageLayout): [number, number] {
 export const PX_PER_MM = 96 / 25.4;
 
 /** Verovio options for a page layout. Verovio page units are tenths of a millimetre. */
-export function verovioOptions(layout: PageLayout, mode: 'page' | 'continuous'): Record<string, unknown> {
+export function verovioOptions(layout: PageLayout, mode: 'page' | 'continuous', forcedBreaks = false): Record<string, unknown> {
   const [w, h] = pageSizeMm(layout);
   const base: Record<string, unknown> = {
     pageWidth: Math.round(w * 10),
@@ -30,7 +30,12 @@ export function verovioOptions(layout: PageLayout, mode: 'page' | 'continuous'):
     svgRemoveXlink: true,
     header: 'encoded',
     footer: 'encoded',
-    breaks: 'auto',
+    // Fixed measures per system → only encoded system breaks (pages still automatic);
+    // occasional forced breaks → automatic layout that always honours them.
+    breaks: layout.measuresPerSystem > 0 ? 'line' : forcedBreaks ? 'smart' : 'auto',
+    breaksSmartSb: 0,
+    spacingStaff: Math.max(0, Math.min(48, Math.round(layout.staffSpacing ?? 12))),
+    spacingSystem: Math.max(0, Math.min(48, Math.round(layout.systemSpacing ?? 6))),
     adjustPageHeight: false,
     justifyVertically: false,
     font: 'Leipzig',
@@ -40,4 +45,9 @@ export function verovioOptions(layout: PageLayout, mode: 'page' | 'continuous'):
     Object.assign(base, { breaks: 'none', adjustPageWidth: true, adjustPageHeight: true, header: 'none', footer: 'none' });
   }
   return base;
+}
+
+/** True if the score encodes system/page breaks (sections, manual breaks). */
+export function hasForcedBreaks(score: { measures: { breakBefore?: string; section?: unknown }[] }): boolean {
+  return score.measures.some((m) => m.breakBefore || m.section);
 }

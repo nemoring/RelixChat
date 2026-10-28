@@ -5,7 +5,7 @@ import { player } from '../playback/player';
 
 type Item = string | '-';
 const MENUS: { title: string; items: Item[] }[] = [
-  { title: 'Файл', items: ['file.new', 'file.open', '-', 'file.save', 'file.saveAs', '-', 'export.midi', 'export.wav', '-', 'file.info'] },
+  { title: 'Файл', items: ['file.new', 'file.open', 'file.importXml', '-', 'file.save', 'file.saveAs', '-', 'file.preview', 'file.print', '-', 'export.pdf', 'export.musicxml', 'export.midi', 'export.wav', '-', 'file.info'] },
   {
     title: 'Правка',
     items: ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.delete', '-', 'edit.selectAll', '-', 'edit.up', 'edit.down', 'edit.octUp', 'edit.octDown', '-', 'edit.goto'],

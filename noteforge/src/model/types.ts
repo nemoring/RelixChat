@@ -203,7 +203,7 @@ export interface PageLayout {
   staffScale: number;
   /** Fixed number of measures per system (0 = automatic). */
   measuresPerSystem: number;
-  /** Extra space between staves / systems (Verovio units, defaults 12 / 12). */
+  /** Minimal space between staves / systems (Verovio units, defaults 12 / 6). */
   staffSpacing: number;
   systemSpacing: number;
   showPageNumbers: boolean;

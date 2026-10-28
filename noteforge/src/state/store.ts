@@ -51,7 +51,7 @@ export interface ViewState {
 }
 
 export interface Dialog {
-  kind: 'none' | 'scoreInfo' | 'newScore' | 'timeSig' | 'measures' | 'gotoMeasure' | 'stats' | 'shortcuts' | 'about' | 'pageSetup' | 'message' | 'mixer' | 'tempo' | 'tuplet' | 'transpose' | 'volta' | 'repeatTimes';
+  kind: 'none' | 'scoreInfo' | 'newScore' | 'timeSig' | 'measures' | 'gotoMeasure' | 'stats' | 'shortcuts' | 'about' | 'message' | 'mixer' | 'tempo' | 'tuplet' | 'transpose' | 'volta' | 'repeatTimes' | 'preview';
   message?: { title: string; text: string };
 }
 

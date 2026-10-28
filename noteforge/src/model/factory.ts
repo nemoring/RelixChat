@@ -73,7 +73,7 @@ export function createPianoScore(opts: NewScoreOptions = {}): Score {
       staffScale: 100,
       measuresPerSystem: 0,
       staffSpacing: 12,
-      systemSpacing: 12,
+      systemSpacing: 6,
       showPageNumbers: true,
       showHeader: true,
     },

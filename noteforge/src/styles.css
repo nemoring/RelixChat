@@ -836,3 +836,103 @@ button.small.on {
   stroke-linejoin: round;
   opacity: 0.55;
 }
+
+/* ── print preview ── */
+.preview {
+  display: flex;
+  width: calc(100vw - 40px);
+  height: calc(100vh - 40px);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.pv-side {
+  width: 300px;
+  flex: none;
+  padding: 14px;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--bg-3);
+  user-select: text;
+}
+.pv-side h2 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+.pv-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.pv-buttons button {
+  height: 32px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--bg-4);
+  cursor: pointer;
+}
+.pv-buttons button.primary {
+  background: var(--accent-2);
+  border-color: var(--accent);
+  color: #fff;
+}
+.pv-pages {
+  flex: 1;
+  overflow: auto;
+  background: var(--canvas);
+  position: relative;
+}
+.pv-zoom {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(22, 24, 29, 0.85);
+}
+.pv-zoom button {
+  width: 26px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg-4);
+  cursor: pointer;
+}
+.pv-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  padding: 20px;
+  justify-content: center;
+}
+.pv-page {
+  background: #fff;
+  position: relative;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  flex: none;
+}
+.pv-num {
+  position: absolute;
+  bottom: -18px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  color: #c9cfd9;
+}
+.hint.error {
+  color: var(--danger);
+}
+.pv-side .row .field,
+.modal .row .field {
+  min-width: 0;
+}
+.pv-side .field input,
+.pv-side .field select {
+  width: 100%;
+  min-width: 0;
+}

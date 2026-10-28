@@ -7,6 +7,8 @@
 import * as A from '../state/actions';
 import * as P from '../state/playback';
 import * as N from '../state/notation';
+import * as PR from '../state/printing';
+import * as IO from '../state/io';
 import { player } from '../playback/player';
 import { getState } from '../state/store';
 import type { DurBase, Step } from '../model/types';
@@ -85,7 +87,7 @@ const list: Command[] = [
   { id: 'measure.delete', label: 'Удалить выделенные такты', keys: ['Ctrl+Delete'], group: 'Такты', run: A.deleteSelectedMeasures, enabled: hasSelection },
   // Format
   { id: 'format.timeSig', label: 'Размер…', keys: ['Ctrl+T'], group: 'Формат', run: () => A.openDialog('timeSig') },
-  { id: 'format.page', label: 'Параметры страницы…', keys: [], group: 'Формат', run: () => A.openDialog('pageSetup') },
+  { id: 'format.page', label: 'Параметры страницы и просмотр…', keys: [], group: 'Формат', run: () => A.openDialog('preview') },
   // View
   { id: 'view.zoomIn', label: 'Увеличить', keys: ['Ctrl+='], group: 'Вид', run: () => A.zoomBy(1.15) },
   { id: 'view.zoomOut', label: 'Уменьшить', keys: ['Ctrl+-'], group: 'Вид', run: () => A.zoomBy(1 / 1.15) },
@@ -166,6 +168,11 @@ const list: Command[] = [
   { id: 'play.speed100', label: 'Скорость 100 %', keys: [], group: 'Воспроизведение', run: () => player.setSpeed(1) },
   { id: 'play.mixer', label: 'Микшер…', keys: ['F10'], group: 'Воспроизведение', run: () => A.openDialog('mixer') },
   { id: 'play.soundfont', label: 'Загрузить SoundFont (.sf2)…', keys: [], group: 'Воспроизведение', run: () => void P.chooseSoundFont() },
+  { id: 'file.preview', label: 'Предварительный просмотр…', keys: ['Ctrl+F2'], group: 'Файл', run: () => A.openDialog('preview') },
+  { id: 'file.print', label: 'Печать…', keys: ['Ctrl+P'], group: 'Файл', run: () => void PR.printDocument() },
+  { id: 'export.pdf', label: 'Экспорт в PDF…', keys: ['Ctrl+E'], group: 'Файл', run: () => void PR.exportPdf() },
+  { id: 'file.importXml', label: 'Импорт MusicXML (.musicxml, .xml, .mxl)…', keys: ['Ctrl+I'], group: 'Файл', run: () => void IO.importMusicXml() },
+  { id: 'export.musicxml', label: 'Экспорт в MusicXML…', keys: [], group: 'Файл', run: () => void IO.exportMusicXml() },
   { id: 'export.midi', label: 'Экспорт в MIDI…', keys: [], group: 'Файл', run: () => void P.exportMidi() },
   { id: 'export.wav', label: 'Экспорт в WAV…', keys: [], group: 'Файл', run: () => void P.exportWav() },
   // Tools / help

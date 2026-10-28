@@ -7,7 +7,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { useStore, getState } from '../state/store';
 import { scoreToMei, parseStaffSvgId, measureSvgId, staffSvgId, type ElementRef } from '../engrave/mei';
 import { getEngraver } from '../engrave/engraver';
-import { verovioOptions, pageSizeMm, PX_PER_MM } from '../engrave/layout';
+import { verovioOptions, pageSizeMm, PX_PER_MM, hasForcedBreaks } from '../engrave/layout';
 import { getStaff, timeline, clefAt, staffCount, ottavaOctaves, eventIndex, comparePos } from '../model/query';
 import { selectedEvents } from '../state/selection';
 import { svgIdOf } from '../engrave/mei';
@@ -76,7 +76,7 @@ export function ScoreView() {
   useEffect(() => {
     let cancelled = false;
     const { mei, index } = scoreToMei(score);
-    engraver.load(mei, verovioOptions(score.layout, view.mode)).then((info) => {
+    engraver.load(mei, verovioOptions(score.layout, view.mode, hasForcedBreaks(score))).then((info) => {
       if (cancelled || !info) return;
       if (!info.ok) {
         setError(info.log || 'Verovio не смог обработать партитуру');
