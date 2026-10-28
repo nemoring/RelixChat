@@ -14,6 +14,7 @@ import { parseProject, serializeProject } from '../model/serialize';
 import { commit, getState, setState, undo, redo, loadDocument, isDirty, type Selection, type Cursor, type AppState } from './store';
 import { platform } from '../platform';
 import { previewSelection } from './playback';
+import { selectedEvents, selectionMeasures } from './selection';
 
 export { undo, redo };
 
@@ -86,6 +87,12 @@ function writeAtCursor(label: string, tpl: E.Template, cursorOverride?: Cursor):
   if (tpl.type === 'chord') previewSelection();
 }
 
+/** Attributes for newly entered notes (the active melody line). */
+function lineAttrs(): E.ChordAttrs | undefined {
+  const line = getState().input.line;
+  return line ? { line } : undefined;
+}
+
 /** Letter key A–G. With addToChord the pitch is added above the selected chord. */
 export function enterNote(step: Step, addToChord = false): void {
   const s = getState();
@@ -111,7 +118,7 @@ export function enterNote(step: Step, addToChord = false): void {
   }
   const ref = referenceDiatonic(st.score, c);
   const octave = nearestOctave(step, ref);
-  writeAtCursor(`Нота ${step}`, { type: 'chord', notes: [{ step, octave, alter: keyAlter(key, step) }] });
+  writeAtCursor(`Нота ${step}`, { type: 'chord', notes: [{ step, octave, alter: keyAlter(key, step) }], attrs: lineAttrs() });
 }
 
 /** Mouse entry: note at a staff position (diatonic) and time. */
@@ -131,7 +138,7 @@ export function enterNoteAt(staff: number, measure: number, time: Frac, diatonic
   }
   const cursor: Cursor = { staff, measure, voice, time };
   if (s.input.rest) writeAtCursor('Пауза', { type: 'rest' }, cursor);
-  else writeAtCursor(`Нота ${p.step}`, { type: 'chord', notes: [pitch] }, cursor);
+  else writeAtCursor(`Нота ${p.step}`, { type: 'chord', notes: [pitch], attrs: lineAttrs() }, cursor);
 }
 
 function addPitch(p: Pitch): void {
@@ -199,35 +206,20 @@ export function toggleRestMode(): void {
 
 // ───────────────────────────── pitch edits ─────────────────────────────
 
-/** Notes affected by pitch commands: the selected note, chord, or every note in a range. */
+/** Notes affected by pitch commands: the selected note, or every note of the selected chords. */
 function forEachSelectedNote(d: Score, fn: (n: ChordEvent['notes'][number], key: number) => void): void {
   const sel = getState().selection;
-  if (sel.kind === 'event') {
-    const f = findEvent(d, sel.eventId, sel);
-    if (!f || f.ev.type !== 'chord') return;
-    const key = keyAt(d, f.measure);
-    for (const n of f.ev.notes) if (!sel.noteId || n.id === sel.noteId) fn(n, key);
-  } else if (sel.kind === 'range') {
-    for (let s = sel.staffFrom; s <= sel.staffTo; s++) {
-      for (let m = sel.mFrom; m <= sel.mTo; m++) {
-        const key = keyAt(d, m);
-        for (const v of getStaff(d, s).measures[m].voices) for (const ev of v) if (ev.type === 'chord') ev.notes.forEach((n) => fn(n, key));
-      }
-    }
+  for (const e of selectedEvents(d, sel)) {
+    if (e.ev.type !== 'chord') continue;
+    const key = keyAt(d, e.measure);
+    for (const n of e.ev.notes) if (sel.kind !== 'event' || !sel.noteId || n.id === sel.noteId) fn(n, key);
   }
 }
 
 function sortSelectedChords(d: Score): void {
-  const sel = getState().selection;
-  const all: ChordEvent[] = [];
-  if (sel.kind === 'event') {
-    const f = findEvent(d, sel.eventId, sel);
-    if (f && f.ev.type === 'chord') all.push(f.ev);
-  } else if (sel.kind === 'range') {
-    for (let s = sel.staffFrom; s <= sel.staffTo; s++)
-      for (let m = sel.mFrom; m <= sel.mTo; m++) for (const v of getStaff(d, s).measures[m].voices) for (const ev of v) if (ev.type === 'chord') all.push(ev);
-  }
-  for (const ev of all) {
+  for (const e of selectedEvents(d, getState().selection)) {
+    const ev = e.ev;
+    if (ev.type !== 'chord') continue;
     ev.notes.sort((a, b) => midiOf(a) - midiOf(b));
     // Remove exact duplicates that transposition may have produced.
     ev.notes = ev.notes.filter((n, i) => i === 0 || diatonicOf(n) !== diatonicOf(ev.notes[i - 1]) || n.alter !== ev.notes[i - 1].alter);
@@ -293,7 +285,16 @@ export function toggleTie(): void {
 
 // ───────────────────────────── selection ─────────────────────────────
 
-export function selectElement(ref: { staff: number; measure: number; voice: number; eventId: string; noteId?: string }): void {
+export function selectElement(ref: { staff: number; measure: number; voice: number; eventId: string; noteId?: string }, extend = false): void {
+  const sel = getState().selection;
+  if (extend && (sel.kind === 'event' || sel.kind === 'span')) {
+    const anchor = sel.kind === 'event' ? { staff: sel.staff, measure: sel.measure, voice: sel.voice, eventId: sel.eventId } : sel.anchor;
+    const focus = { staff: ref.staff, measure: ref.measure, voice: ref.voice, eventId: ref.eventId };
+    if (anchor.eventId !== focus.eventId) {
+      setState({ selection: { kind: 'span', anchor, focus } });
+      return;
+    }
+  }
   setState({ selection: { kind: 'event', ...ref } });
   previewSelection();
 }
@@ -306,8 +307,8 @@ export function revealMeasure(m: number): void {
 export function selectMeasure(staff: number, measure: number, extend: boolean): void {
   const sel = getState().selection;
   if (extend && sel.kind !== 'none') {
-    const aStaff = sel.kind === 'range' ? sel.anchorStaff : sel.staff;
-    const aM = sel.kind === 'range' ? sel.anchorMeasure : sel.measure;
+    const aStaff = sel.kind === 'range' ? sel.anchorStaff : sel.kind === 'span' ? sel.anchor.staff : sel.staff;
+    const aM = sel.kind === 'range' ? sel.anchorMeasure : sel.kind === 'span' ? sel.anchor.measure : sel.measure;
     setState({
       selection: {
         kind: 'range',
@@ -374,11 +375,19 @@ export function moveHorizontal(dir: 1 | -1, extend = false): void {
     }
     return;
   }
-  if (sel.kind !== 'event') return;
-  if (extend) {
-    selectMeasure(sel.staff, sel.measure, false);
+  if (sel.kind === 'span' || (sel.kind === 'event' && extend)) {
+    const focus = sel.kind === 'span' ? sel.focus : sel;
+    const anchor = sel.kind === 'span' ? sel.anchor : { staff: sel.staff, measure: sel.measure, voice: sel.voice, eventId: sel.eventId };
+    const next = stepEvent(score, focus, dir);
+    if (!next) return;
+    if (!extend) {
+      selectElement(next);
+      return;
+    }
+    setState({ selection: next.eventId === anchor.eventId ? { kind: 'event', ...anchor } : { kind: 'span', anchor, focus: next }, ...reveal(next.measure) });
     return;
   }
+  if (sel.kind !== 'event') return;
   const f = findEvent(score, sel.eventId, sel);
   if (!f) return;
   const st = getStaff(score, f.staff);
@@ -395,6 +404,23 @@ export function moveHorizontal(dir: 1 | -1, extend = false): void {
     if (m < 0 || m >= score.measures.length) return;
     i = dir > 0 ? 0 : st.measures[m].voices[f.voice].length - 1;
   }
+}
+
+/** The neighbouring event in the same staff and voice (across barlines). */
+function stepEvent(score: Score, ref: { staff: number; measure: number; voice: number; eventId: string }, dir: 1 | -1) {
+  const f = findEvent(score, ref.eventId, ref);
+  if (!f) return null;
+  const st = getStaff(score, f.staff);
+  let m = f.measure;
+  let i = f.index + dir;
+  while (m >= 0 && m < score.measures.length) {
+    const evs = st.measures[m].voices[f.voice];
+    if (i >= 0 && i < evs.length) return { staff: f.staff, measure: m, voice: f.voice, eventId: evs[i].id };
+    m += dir;
+    if (m < 0 || m >= score.measures.length) return null;
+    i = dir > 0 ? 0 : st.measures[m].voices[f.voice].length - 1;
+  }
+  return null;
 }
 
 /** Alt+Up/Down: moves the selection between notes of a chord. */
@@ -434,6 +460,12 @@ export function deleteSelection(): void {
     });
   } else if (sel.kind === 'range') {
     commit('Такты очищены', (d) => E.clearRange(d, sel.staffFrom, sel.staffTo, sel.mFrom, sel.mTo));
+  } else if (sel.kind === 'span') {
+    commit('Удалено', (d) => {
+      const evs = selectedEvents(d, sel).reverse();
+      for (const e of evs) if (e.ev.type === 'chord') E.deleteEvent(d, e.staff, e.measure, e.voice, e.ev.id);
+      return { selection: { kind: 'none' } };
+    });
   }
 }
 
@@ -444,8 +476,11 @@ function selectedMeasure(): number | null {
   if (s.input.active && s.cursor) return s.cursor.measure;
   if (s.selection.kind === 'event') return s.selection.measure;
   if (s.selection.kind === 'range') return s.selection.mFrom;
+  if (s.selection.kind === 'span') return Math.min(s.selection.anchor.measure, s.selection.focus.measure);
   return null;
 }
+
+export { selectedMeasure };
 
 export function appendMeasures(n: number): void {
   commit(`Добавлено тактов: ${n}`, (d) => {
@@ -473,6 +508,7 @@ export function deleteSelectedMeasures(): void {
   let from: number, to: number;
   if (sel.kind === 'range') [from, to] = [sel.mFrom, sel.mTo];
   else if (sel.kind === 'event') from = to = sel.measure;
+  else if (sel.kind === 'span') [from, to] = [Math.min(sel.anchor.measure, sel.focus.measure), Math.max(sel.anchor.measure, sel.focus.measure)];
   else return;
   if (to - from + 1 >= s.score.measures.length) {
     setState({ status: 'Нельзя удалить все такты партитуры' });
@@ -501,8 +537,10 @@ export function applyKeySig(fifths: number): void {
 
 export function applyClef(clef: ClefKind): void {
   const s = getState();
-  const staff = s.cursor?.staff ?? (s.selection.kind === 'event' ? s.selection.staff : s.selection.kind === 'range' ? s.selection.staffFrom : 0);
-  commit('Ключ', (d) => E.setClef(d, staff, clef));
+  const sel = s.selection;
+  const staff = s.cursor?.staff ?? (sel.kind === 'event' ? sel.staff : sel.kind === 'range' ? sel.staffFrom : sel.kind === 'span' ? sel.anchor.staff : 0);
+  const m = selectedMeasure() ?? 0;
+  commit('Ключ', (d) => E.setClef(d, staff, clef, m));
 }
 
 // ───────────────────────────── clipboard ─────────────────────────────
@@ -512,6 +550,12 @@ export function copySelection(): boolean {
   const sel = s.selection;
   if (sel.kind === 'range') {
     clipboard = E.copyRange(s.score, sel.staffFrom, sel.staffTo, sel.mFrom, sel.mTo);
+    setState({ status: `Скопировано тактов: ${clipboard.measures}` });
+    return true;
+  }
+  if (sel.kind === 'span') {
+    const r = selectionMeasures(s.score, sel)!;
+    clipboard = E.copyRange(s.score, r.staffFrom, r.staffTo, r.from, r.to);
     setState({ status: `Скопировано тактов: ${clipboard.measures}` });
     return true;
   }

@@ -15,13 +15,24 @@ setAutoFreeze(true);
 export type Selection =
   | { kind: 'none' }
   | { kind: 'event'; staff: number; measure: number; voice: number; eventId: string; noteId?: string }
-  | { kind: 'range'; staffFrom: number; staffTo: number; mFrom: number; mTo: number; anchorStaff: number; anchorMeasure: number };
+  | { kind: 'range'; staffFrom: number; staffTo: number; mFrom: number; mTo: number; anchorStaff: number; anchorMeasure: number }
+  /** A run of events from an anchor event to a focus event (possibly on another staff). */
+  | { kind: 'span'; anchor: EventRef; focus: EventRef };
+
+export interface EventRef {
+  staff: number;
+  measure: number;
+  voice: number;
+  eventId: string;
+}
 
 export interface InputState {
   active: boolean;
   dur: Duration;
   rest: boolean;
   voice: number;
+  /** Melody line assigned to newly entered notes (null = none). */
+  line: string | null;
 }
 
 export interface Cursor {
@@ -35,10 +46,12 @@ export interface ViewState {
   zoom: number;
   mode: 'page' | 'continuous';
   showPalette: boolean;
+  /** Colour melody lines on the page and connect their notes. */
+  showLines: boolean;
 }
 
 export interface Dialog {
-  kind: 'none' | 'scoreInfo' | 'newScore' | 'timeSig' | 'measures' | 'gotoMeasure' | 'stats' | 'shortcuts' | 'about' | 'pageSetup' | 'message' | 'mixer';
+  kind: 'none' | 'scoreInfo' | 'newScore' | 'timeSig' | 'measures' | 'gotoMeasure' | 'stats' | 'shortcuts' | 'about' | 'pageSetup' | 'message' | 'mixer' | 'tempo' | 'tuplet' | 'transpose' | 'volta' | 'repeatTimes';
   message?: { title: string; text: string };
 }
 
@@ -76,9 +89,9 @@ function initialState(): AppState {
     savedScore: score,
     filePath: null,
     selection: { kind: 'none' },
-    input: { active: false, dur: { base: 4, dots: 0 }, rest: false, voice: 0 },
+    input: { active: false, dur: { base: 4, dots: 0 }, rest: false, voice: 0, line: null },
     cursor: null,
-    view: { zoom: 1, mode: 'page', showPalette: true },
+    view: { zoom: 1, mode: 'page', showPalette: true, showLines: true },
     dialog: { kind: 'none' },
     status: 'Готово',
     reveal: null,

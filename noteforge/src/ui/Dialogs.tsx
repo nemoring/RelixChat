@@ -8,6 +8,8 @@ import { APP_VERSION } from '../model/serialize';
 import type { PageLayout } from '../model/types';
 import { Mixer } from './Transport';
 import * as P from '../state/playback';
+import * as N from '../state/notation';
+import { selectedMeasure } from '../state/actions';
 
 function Modal({ title, children, onSubmit, submitLabel = 'OK', wide }: { title: string; children: React.ReactNode; onSubmit?: () => void; submitLabel?: string; wide?: boolean }) {
   const ref = useRef<HTMLFormElement>(null);
@@ -363,6 +365,158 @@ function AboutDialog() {
   );
 }
 
+function TempoDialog() {
+  const st = getState();
+  const m = selectedMeasure() ?? 0;
+  const cur = m === 0 ? st.score.tempo : (st.score.measures[m].tempo ?? st.score.tempo);
+  const [t, setT] = useState({ ...cur });
+  const hasChange = m > 0 && !!st.score.measures[m].tempo;
+  return (
+    <Modal
+      title={m === 0 ? 'Темп произведения' : `Смена темпа с такта ${m + 1}`}
+      submitLabel="Применить"
+      onSubmit={() => {
+        A.closeDialog();
+        N.tempoChange({ ...t, bpm: Math.max(10, Math.min(500, t.bpm || 100)) });
+      }}
+    >
+      <Field label="Обозначение (Allegro, a tempo, Meno mosso…)">
+        <input value={t.text} onChange={(e) => setT({ ...t, text: e.target.value })} />
+      </Field>
+      <Field label="Метроном">
+        <span className="inline">
+          <select value={`${t.beatUnit}:${t.beatDots}`} onChange={(e) => {
+            const [u, d] = e.target.value.split(':').map(Number);
+            setT({ ...t, beatUnit: u, beatDots: d });
+          }}>
+            <option value="2:0">𝅗𝅥</option>
+            <option value="4:0">♩</option>
+            <option value="4:1">♩.</option>
+            <option value="8:0">♪</option>
+          </select>
+          =
+          <input type="number" min={10} max={500} value={t.bpm} onChange={(e) => setT({ ...t, bpm: Number(e.target.value) })} />
+        </span>
+      </Field>
+      {hasChange && (
+        <button type="button" className="small" onClick={() => {
+          A.closeDialog();
+          N.tempoChange(undefined);
+        }}>
+          Удалить смену темпа в этом такте
+        </button>
+      )}
+    </Modal>
+  );
+}
+
+function TupletDialog() {
+  const [num, setNum] = useState(5);
+  const [den, setDen] = useState(4);
+  return (
+    <Modal title="Ритмическая группа" submitLabel="Создать" onSubmit={() => {
+      A.closeDialog();
+      N.tuplet(num, den);
+    }}>
+      <p className="hint">Группа заменит выделенную ноту (или, в режиме ввода, длительность ввода от курсора): {num} нот в времени {den}.</p>
+      <div className="row">
+        <Field label="Нот в группе">
+          <input type="number" min={2} max={32} value={num} onChange={(e) => setNum(Number(e.target.value))} />
+        </Field>
+        <Field label="Вместо (нот обычной длительности)">
+          <input type="number" min={1} max={32} value={den} onChange={(e) => setDen(Number(e.target.value))} />
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
+const INTERVALS: { label: string; steps: number; semitones: number }[] = [
+  { label: 'Малая секунда', steps: 1, semitones: 1 },
+  { label: 'Большая секунда', steps: 1, semitones: 2 },
+  { label: 'Малая терция', steps: 2, semitones: 3 },
+  { label: 'Большая терция', steps: 2, semitones: 4 },
+  { label: 'Чистая кварта', steps: 3, semitones: 5 },
+  { label: 'Увеличенная кварта', steps: 3, semitones: 6 },
+  { label: 'Уменьшённая квинта', steps: 4, semitones: 6 },
+  { label: 'Чистая квинта', steps: 4, semitones: 7 },
+  { label: 'Малая секста', steps: 5, semitones: 8 },
+  { label: 'Большая секста', steps: 5, semitones: 9 },
+  { label: 'Малая септима', steps: 6, semitones: 10 },
+  { label: 'Большая септима', steps: 6, semitones: 11 },
+  { label: 'Октава', steps: 7, semitones: 12 },
+];
+
+function TransposeDialog() {
+  const hasSel = getState().selection.kind !== 'none';
+  const [iv, setIv] = useState(1);
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [scope, setScope] = useState<'selection' | 'all'>(hasSel ? 'selection' : 'all');
+  const [keys, setKeys] = useState(true);
+  return (
+    <Modal title="Транспонирование" submitLabel="Транспонировать" onSubmit={() => {
+      A.closeDialog();
+      const i = INTERVALS[iv];
+      N.transpose({ steps: i.steps * dir, semitones: i.semitones * dir }, scope, keys);
+    }}>
+      <div className="row">
+        <Field label="Направление">
+          <select value={dir} onChange={(e) => setDir(Number(e.target.value) as 1 | -1)}>
+            <option value={1}>Вверх</option>
+            <option value={-1}>Вниз</option>
+          </select>
+        </Field>
+        <Field label="Интервал">
+          <select value={iv} onChange={(e) => setIv(Number(e.target.value))}>
+            {INTERVALS.map((x, i) => (
+              <option key={i} value={i}>{x.label}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <Field label="Что транспонировать">
+        <select value={scope} onChange={(e) => setScope(e.target.value as 'selection' | 'all')}>
+          {hasSel && <option value="selection">Выделенные такты</option>}
+          <option value="all">Всю партитуру</option>
+        </select>
+      </Field>
+      <label className="field check-row">
+        <input type="checkbox" checked={keys} onChange={(e) => setKeys(e.target.checked)} /> Транспонировать ключевые знаки (когда выбраны оба нотоносца)
+      </label>
+    </Modal>
+  );
+}
+
+function VoltaDialog() {
+  const [text, setText] = useState('1, 2');
+  return (
+    <Modal title="Вольта" submitLabel="Поставить" onSubmit={() => {
+      const nums = text.split(/[^0-9]+/).map(Number).filter((n) => n > 0);
+      A.closeDialog();
+      if (nums.length) N.volta(nums);
+    }}>
+      <p className="hint">Вольта ставится над выделенными тактами. Номера — проходы, на которых она играется (например «1, 2» или «3»).</p>
+      <Field label="Номера проходов">
+        <input value={text} onChange={(e) => setText(e.target.value)} />
+      </Field>
+    </Modal>
+  );
+}
+
+function RepeatTimesDialog() {
+  const [n, setN] = useState(3);
+  return (
+    <Modal title="Конец повтора" submitLabel="Поставить" onSubmit={() => {
+      A.closeDialog();
+      N.repeatEnd(Math.max(2, Math.min(16, n)));
+    }}>
+      <Field label="Сколько раз играть фрагмент">
+        <input type="number" min={2} max={16} value={n} onChange={(e) => setN(Number(e.target.value))} />
+      </Field>
+    </Modal>
+  );
+}
+
 function MessageDialog() {
   const msg = useStore((s) => s.dialog.message);
   return (
@@ -418,6 +572,16 @@ export function Dialogs() {
       return <AboutDialog />;
     case 'message':
       return <MessageDialog />;
+    case 'tempo':
+      return <TempoDialog />;
+    case 'tuplet':
+      return <TupletDialog />;
+    case 'transpose':
+      return <TransposeDialog />;
+    case 'volta':
+      return <VoltaDialog />;
+    case 'repeatTimes':
+      return <RepeatTimesDialog />;
     case 'mixer':
       return (
         <Modal title="Микшер">

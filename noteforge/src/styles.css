@@ -83,6 +83,8 @@ button {
   background: var(--bg-4);
 }
 .menu-dropdown {
+  max-height: calc(100vh - 50px);
+  overflow-y: auto;
   position: absolute;
   top: 100%;
   left: 0;
@@ -237,9 +239,13 @@ button {
   background: var(--bg-4);
 }
 .pal-item small {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-dim);
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.05;
+  max-width: 100%;
+  padding: 0 2px;
 }
 .pal-item .big {
   font-size: 30px;
@@ -729,4 +735,104 @@ button.small {
 .playhead-measure {
   position: absolute;
   background: rgba(255, 138, 31, 0.08);
+}
+
+/* ── palette (stage 3) ── */
+.pal-glyph {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.dyn {
+  font: italic 700 18px Georgia, 'Times New Roman', serif;
+}
+.small-dyn {
+  font-size: 13px;
+}
+.tiny-dyn {
+  font-size: 9px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.1;
+}
+.tempo-txt {
+  font: 700 12px Georgia, serif;
+}
+.melody-panel {
+  margin: 8px 10px 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-3);
+}
+.melody-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.melody-head .check {
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.melody-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 4px;
+}
+.melody-row.active {
+  background: rgba(76, 155, 255, 0.15);
+}
+.melody-row input[type='color'] {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.melody-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.melody-row button.small,
+.melody-actions button.small {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+button.small.on {
+  background: var(--accent-2);
+  border-color: var(--accent);
+  color: #fff;
+}
+.melody-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 6px;
+  align-items: center;
+}
+.hint-inline {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.check-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+.melody-path {
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.55;
 }

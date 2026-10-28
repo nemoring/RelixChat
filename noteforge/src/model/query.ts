@@ -1,6 +1,6 @@
 import type { ClefKind, Score, Staff, TimeSig, VoiceEvent, ChordEvent } from './types';
 import { Frac, ZERO, add } from './fraction';
-import { durToFrac, measureLength } from './duration';
+import { eventLen, measureLength } from './duration';
 
 export interface StaffRef {
   partIndex: number;
@@ -46,8 +46,53 @@ export function keyAt(score: Score, m: number): number {
   return 0;
 }
 
-export function clefAt(score: Score, staffIndex: number, _m: number): ClefKind {
-  return getStaff(score, staffIndex).clef;
+/** Clef in effect at measure m of a staff (initial clef or the latest clef change). */
+export function clefAt(score: Score, staffIndex: number, m: number): ClefKind {
+  const st = getStaff(score, staffIndex);
+  for (let i = Math.min(m, st.measures.length - 1); i > 0; i--) {
+    const c = st.measures[i].clef;
+    if (c) return c;
+  }
+  return st.measures[0]?.clef ?? st.clef;
+}
+
+export interface IndexedEvent {
+  staff: number;
+  measure: number;
+  voice: number;
+  index: number;
+  start: Frac;
+  end: Frac;
+  ev: VoiceEvent;
+}
+
+const indexCache = new WeakMap<Score, Map<string, IndexedEvent>>();
+
+/** Id → location of every event (cached per immutable score version). */
+export function eventIndex(score: Score): Map<string, IndexedEvent> {
+  let idx = indexCache.get(score);
+  if (idx) return idx;
+  idx = new Map();
+  const refs = staffRefs(score);
+  refs.forEach((r, s) =>
+    r.staff.measures.forEach((sm, m) =>
+      sm.voices.forEach((events, v) => {
+        let t = ZERO;
+        events.forEach((ev, i) => {
+          const end = add(t, eventLen(ev));
+          idx!.set(ev.id, { staff: s, measure: m, voice: v, index: i, start: t, end, ev });
+          t = end;
+        });
+      }),
+    ),
+  );
+  if (Object.isFrozen(score)) indexCache.set(score, idx);
+  return idx;
+}
+
+/** Orders two score positions. */
+export function comparePos(a: { measure: number; start: Frac }, b: { measure: number; start: Frac }): number {
+  return a.measure - b.measure || a.start.n * b.start.d - b.start.n * a.start.d;
 }
 
 export function measureLen(score: Score, m: number): Frac {
@@ -86,13 +131,13 @@ export function timeline(events: VoiceEvent[]): Timed[] {
   let t = ZERO;
   return events.map((ev, index) => {
     const start = t;
-    t = add(t, durToFrac(ev.dur));
+    t = add(t, eventLen(ev));
     return { ev, index, start, end: t };
   });
 }
 
 export function voiceLength(events: VoiceEvent[]): Frac {
-  return events.reduce((acc, e) => add(acc, durToFrac(e.dur)), ZERO);
+  return events.reduce((acc, e) => add(acc, eventLen(e)), ZERO);
 }
 
 export interface EventLoc {
@@ -117,7 +162,7 @@ export function findEvent(score: Score, eventId: string, hint?: Partial<EventLoc
     let t = ZERO;
     for (let i = 0; i < events.length; i++) {
       if (events[i].id === eventId) return { staff: s, measure: m, voice: v, eventId, ev: events[i], index: i, start: t };
-      t = add(t, durToFrac(events[i].dur));
+      t = add(t, eventLen(events[i]));
     }
     return null;
   };
@@ -164,7 +209,7 @@ export function findNote(score: Score, noteId: string, hint?: Partial<EventLoc>)
             const noteIndex = ev.notes.findIndex((n) => n.id === noteId);
             if (noteIndex >= 0) return { staff: s, measure: m, voice: v, eventId: ev.id, ev, index: i, start: t, noteIndex };
           }
-          t = add(t, durToFrac(ev.dur));
+          t = add(t, eventLen(ev));
         }
       }
     }
@@ -192,4 +237,19 @@ export function previousChord(score: Score, staff: number, measure: number, voic
     }
   }
   return null;
+}
+
+/** Octaves between written and sounding pitch at a position (8va → +1, 15ma → +2, 8vb → −1). */
+export function ottavaOctaves(score: Score, staff: number, measure: number, time: Frac): number {
+  const idx = eventIndex(score);
+  for (const sp of score.spanners) {
+    if (sp.type !== 'ottava' || !sp.ottava) continue;
+    const a = idx.get(sp.start);
+    const b = idx.get(sp.end);
+    if (!a || !b || a.staff !== staff) continue;
+    const [s0, e0] = comparePos(a, b) <= 0 ? [a, b] : [b, a];
+    const pos = { measure, start: time };
+    if (comparePos(pos, s0) >= 0 && comparePos(pos, { measure: e0.measure, start: e0.end }) < 0) return sp.ottava === 8 ? 1 : sp.ottava === 15 ? 2 : sp.ottava === -8 ? -1 : -2;
+  }
+  return 0;
 }

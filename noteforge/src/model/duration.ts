@@ -1,12 +1,22 @@
-import type { Duration, DurBase, TimeSig } from './types';
+import type { Duration, DurBase, TimeSig, VoiceEvent } from './types';
 import { DUR_BASES } from './types';
-import { Frac, frac, add, sub, le, isZero, isMultipleOf, ZERO } from './fraction';
+import { Frac, frac, add, sub, le, isZero, isMultipleOf, ZERO, mul } from './fraction';
 
 /** Length of a duration in whole notes. base 4 + 1 dot → 3/8. */
 export function durToFrac(d: Duration): Frac {
   // value = (1/base) * (2 - 1/2^dots)
   const p = 2 ** d.dots;
   return frac(2 * p - 1, d.base * p);
+}
+
+/**
+ * Metric length of an event: grace notes take no time, tuplet members are
+ * scaled by den/num (an eighth in a triplet lasts 1/12).
+ */
+export function eventLen(ev: VoiceEvent): Frac {
+  if (ev.type === 'chord' && ev.grace) return ZERO;
+  const base = durToFrac(ev.dur);
+  return ev.tuplet ? mul(base, frac(ev.tuplet.den, ev.tuplet.num)) : base;
 }
 
 export function measureLength(ts: TimeSig): Frac {

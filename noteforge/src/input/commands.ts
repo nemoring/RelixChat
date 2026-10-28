@@ -6,6 +6,7 @@
  */
 import * as A from '../state/actions';
 import * as P from '../state/playback';
+import * as N from '../state/notation';
 import { player } from '../playback/player';
 import { getState } from '../state/store';
 import type { DurBase, Step } from '../model/types';
@@ -92,6 +93,67 @@ const list: Command[] = [
   { id: 'view.page', label: 'Постраничный вид', keys: [], group: 'Вид', run: () => A.setViewMode('page') },
   { id: 'view.continuous', label: 'Непрерывный вид', keys: [], group: 'Вид', run: () => A.setViewMode('continuous') },
   { id: 'view.palette', label: 'Палитра символов', keys: ['F9'], group: 'Вид', run: A.togglePalette },
+  // Notation (stage 3)
+  { id: 'art.staccato', label: 'Стаккато', keys: ['Shift+S'], group: 'Нотация', run: () => N.toggleArtic('staccato') },
+  { id: 'art.staccatissimo', label: 'Стаккатиссимо', keys: [], group: 'Нотация', run: () => N.toggleArtic('staccatissimo') },
+  { id: 'art.tenuto', label: 'Тенуто', keys: ['Shift+N'], group: 'Нотация', run: () => N.toggleArtic('tenuto') },
+  { id: 'art.accent', label: 'Акцент', keys: ['Shift+V'], group: 'Нотация', run: () => N.toggleArtic('accent') },
+  { id: 'art.marcato', label: 'Маркато', keys: ['Shift+O'], group: 'Нотация', run: () => N.toggleArtic('marcato') },
+  { id: 'art.fermata', label: 'Фермата', keys: [], group: 'Нотация', run: N.toggleFermata },
+  { id: 'orn.trill', label: 'Трель', keys: [], group: 'Нотация', run: () => N.ornament('trill') },
+  { id: 'orn.mordent', label: 'Мордент', keys: [], group: 'Нотация', run: () => N.ornament('mordent') },
+  { id: 'orn.invertedMordent', label: 'Перечёркнутый мордент (пралльтриллер)', keys: [], group: 'Нотация', run: () => N.ornament('invertedMordent') },
+  { id: 'orn.turn', label: 'Группетто', keys: [], group: 'Нотация', run: () => N.ornament('turn') },
+  { id: 'orn.invertedTurn', label: 'Обращённое группетто', keys: [], group: 'Нотация', run: () => N.ornament('invertedTurn') },
+  { id: 'grace.acc', label: 'Форшлаг (короткий, перечёркнутый)', keys: ['/'], group: 'Нотация', run: () => N.grace('acciaccatura') },
+  { id: 'grace.app', label: 'Форшлаг (долгий, апподжиатура)', keys: ['Shift+/'], group: 'Нотация', run: () => N.grace('appoggiatura') },
+  { id: 'line.slur', label: 'Фразировочная лига', keys: ['S'], group: 'Нотация', run: () => N.line('slur') },
+  { id: 'line.cresc', label: 'Crescendo (вилка)', keys: ['Shift+,'], group: 'Нотация', run: () => N.line('cresc') },
+  { id: 'line.dim', label: 'Diminuendo (вилка)', keys: ['Shift+.'], group: 'Нотация', run: () => N.line('dim') },
+  { id: 'line.pedal', label: 'Педаль', keys: ['Ctrl+Shift+P'], group: 'Нотация', run: () => N.line('pedal') },
+  { id: 'line.8va', label: 'Октавой выше (8va)', keys: [], group: 'Нотация', run: () => N.line('ottava', 8) },
+  { id: 'line.8vb', label: 'Октавой ниже (8vb)', keys: [], group: 'Нотация', run: () => N.line('ottava', -8) },
+  { id: 'line.15ma', label: 'Две октавы выше (15ma)', keys: [], group: 'Нотация', run: () => N.line('ottava', 15) },
+  { id: 'line.15mb', label: 'Две октавы ниже (15mb)', keys: [], group: 'Нотация', run: () => N.line('ottava', -15) },
+  { id: 'line.remove', label: 'Удалить лиги и линии у выделенного', keys: ['Ctrl+Shift+Delete'], group: 'Нотация', run: N.removeLines },
+  { id: 'tuplet.3', label: 'Триоль', keys: ['Ctrl+3'], group: 'Нотация', run: () => N.tuplet(3) },
+  { id: 'tuplet.2', label: 'Дуоль', keys: ['Ctrl+2'], group: 'Нотация', run: () => N.tuplet(2) },
+  { id: 'tuplet.4', label: 'Квартоль', keys: ['Ctrl+4'], group: 'Нотация', run: () => N.tuplet(4, 3) },
+  { id: 'tuplet.5', label: 'Квинтоль', keys: ['Ctrl+5'], group: 'Нотация', run: () => N.tuplet(5) },
+  { id: 'tuplet.6', label: 'Секстоль', keys: ['Ctrl+6'], group: 'Нотация', run: () => N.tuplet(6) },
+  { id: 'tuplet.7', label: 'Септоль', keys: ['Ctrl+7'], group: 'Нотация', run: () => N.tuplet(7) },
+  { id: 'tuplet.other', label: 'Другая ритмическая группа…', keys: [], group: 'Нотация', run: () => A.openDialog('tuplet') },
+  { id: 'tuplet.remove', label: 'Удалить ритмическую группу', keys: [], group: 'Нотация', run: N.removeTuplet },
+  { id: 'staff.down', label: 'Перенести на нижний нотоносец', keys: ['Ctrl+Shift+Down'], group: 'Нотация', run: () => N.crossStaff(1) },
+  { id: 'staff.up', label: 'Перенести на верхний нотоносец', keys: ['Ctrl+Shift+Up'], group: 'Нотация', run: () => N.crossStaff(-1) },
+  { id: 'stem.flip', label: 'Штиль: вверх / вниз / авто', keys: ['X'], group: 'Нотация', run: N.flipStem },
+  { id: 'beam.break', label: 'Начать новое ребро', keys: [], group: 'Нотация', run: () => N.beam('break') },
+  { id: 'beam.join', label: 'Соединить ребром с предыдущей', keys: [], group: 'Нотация', run: () => N.beam('join') },
+  { id: 'beam.none', label: 'Без ребра', keys: [], group: 'Нотация', run: () => N.beam('none') },
+  { id: 'rep.start', label: 'Начало повтора', keys: [], group: 'Форма', run: N.repeatStart },
+  { id: 'rep.end', label: 'Конец повтора', keys: [], group: 'Форма', run: () => N.repeatEnd(2) },
+  { id: 'rep.times', label: 'Конец повтора (число раз)…', keys: [], group: 'Форма', run: () => A.openDialog('repeatTimes') },
+  { id: 'rep.volta1', label: 'Вольта 1', keys: [], group: 'Форма', run: () => N.volta([1]) },
+  { id: 'rep.volta2', label: 'Вольта 2', keys: [], group: 'Форма', run: () => N.volta([2]) },
+  { id: 'rep.voltaN', label: 'Вольта…', keys: [], group: 'Форма', run: () => A.openDialog('volta') },
+  { id: 'mk.segno', label: 'Сеньо', keys: [], group: 'Форма', run: () => N.marker('segno') },
+  { id: 'mk.coda', label: 'Кода', keys: [], group: 'Форма', run: () => N.marker('coda') },
+  { id: 'mk.toCoda', label: 'To Coda', keys: [], group: 'Форма', run: () => N.marker('toCoda') },
+  { id: 'mk.fine', label: 'Fine', keys: [], group: 'Форма', run: () => N.marker('fine') },
+  ...(['DC', 'DCalFine', 'DCalCoda', 'DS', 'DSalFine', 'DSalCoda'] as const).map(
+    (j): Command => ({ id: `jump.${j}`, label: j.replace('DC', 'D.C.').replace('DS', 'D.S.').replace('alFine', ' al Fine').replace('alCoda', ' al Coda'), keys: [], group: 'Форма', run: () => N.jump(j) }),
+  ),
+  { id: 'bar.double', label: 'Двойная тактовая черта', keys: [], group: 'Форма', run: () => N.barline('double') },
+  { id: 'bar.final', label: 'Заключительная тактовая черта', keys: [], group: 'Форма', run: () => N.barline('final') },
+  { id: 'tempo.change', label: 'Темп / смена темпа…', keys: ['Alt+T'], group: 'Форма', run: () => A.openDialog('tempo') },
+  { id: 'tools.transpose', label: 'Транспонирование…', keys: ['Ctrl+Shift+T'], group: 'Инструменты', run: () => A.openDialog('transpose') },
+  { id: 'melody.assign', label: 'Добавить / убрать выделенное из мелодии', keys: ['M'], group: 'Мелодия', run: () => N.assignLine() },
+  { id: 'melody.remove', label: 'Убрать выделенное из всех мелодий', keys: ['Shift+M'], group: 'Мелодия', run: () => N.assignLine(null) },
+  { id: 'melody.new', label: 'Новая мелодическая линия', keys: [], group: 'Мелодия', run: N.createLine },
+  { id: 'melody.show', label: 'Показывать мелодические линии', keys: ['Ctrl+Shift+M'], group: 'Мелодия', run: N.toggleShowLines },
+  { id: 'melody.solo', label: 'Слушать только мелодию', keys: [], group: 'Мелодия', run: () => N.listen('melody') },
+  { id: 'melody.accomp', label: 'Слушать только сопровождение', keys: [], group: 'Мелодия', run: () => N.listen('accomp') },
+  { id: 'melody.all', label: 'Слушать всё', keys: [], group: 'Мелодия', run: () => N.listen('all') },
   // Playback
   { id: 'play.toggle', label: 'Воспроизведение / пауза', keys: ['Space'], group: 'Воспроизведение', run: () => void P.playPause() },
   { id: 'play.stop', label: 'Стоп', keys: ['Shift+Space'], group: 'Воспроизведение', run: P.stop },
@@ -135,6 +197,8 @@ export function eventToShortcut(e: KeyboardEvent): string | null {
   else if (/^Digit\d$/.test(e.code)) key = e.code.slice(5);
   else if (e.code === 'Period' || e.code === 'NumpadDecimal') key = '.';
   else if (e.code === 'BracketLeft') key = '[';
+  else if (e.code === 'Comma') key = ',';
+  else if (e.code === 'Slash') key = '/';
   else if (e.code === 'BracketRight') key = ']';
   else if (e.code === 'Equal') key = e.shiftKey ? '+' : '=';
   else if (e.code === 'NumpadAdd') key = '+';

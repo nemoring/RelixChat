@@ -8,7 +8,9 @@ import { useStore, getState } from '../state/store';
 import { scoreToMei, parseStaffSvgId, measureSvgId, staffSvgId, type ElementRef } from '../engrave/mei';
 import { getEngraver } from '../engrave/engraver';
 import { verovioOptions, pageSizeMm, PX_PER_MM } from '../engrave/layout';
-import { getStaff, timeline, clefAt, staffCount } from '../model/query';
+import { getStaff, timeline, clefAt, staffCount, ottavaOctaves, eventIndex, comparePos } from '../model/query';
+import { selectedEvents } from '../state/selection';
+import { svgIdOf } from '../engrave/mei';
 import { clefBottomLine } from '../model/pitch';
 import { Frac, ZERO, cmp } from '../model/fraction';
 import * as A from '../state/actions';
@@ -179,10 +181,68 @@ export function ScoreView() {
       overlay.appendChild(box);
       return box;
     };
+    // Melody lines: colour their notes and connect them across hands and voices.
+    root.querySelectorAll('.nf-line').forEach((el) => {
+      el.classList.remove('nf-line');
+      (el as HTMLElement).style.removeProperty('fill');
+      (el as HTMLElement).style.removeProperty('stroke');
+    });
+    root.querySelectorAll('svg.melody-overlay').forEach((el) => el.remove());
+    if (view.showLines && score.lines.length) {
+      const colors = new Map(score.lines.map((l) => [l.id, l.color]));
+      const byLine = new Map<string, { measure: number; start: { n: number; d: number }; ev: import('../model/types').ChordEvent }[]>();
+      for (const e of eventIndex(score).values()) {
+        if (e.ev.type !== 'chord' || !e.ev.line || !colors.has(e.ev.line)) continue;
+        if (!byLine.has(e.ev.line)) byLine.set(e.ev.line, []);
+        byLine.get(e.ev.line)!.push({ measure: e.measure, start: e.start, ev: e.ev });
+      }
+      for (const [lineId, evs] of byLine) {
+        const color = colors.get(lineId)!;
+        evs.sort((a, b) => comparePos(a, b));
+        let prev: { page: Element; x: number; y: number } | null = null;
+        for (const e of evs) {
+          const top = e.ev.notes[e.ev.notes.length - 1];
+          for (const n of e.ev.notes) {
+            const el = byId(n.id) as HTMLElement | null;
+            if (!el) continue;
+            el.classList.add('nf-line');
+            el.style.setProperty('fill', color);
+            el.style.setProperty('stroke', color);
+          }
+          const head = byId(top.id)?.querySelector('.notehead') ?? byId(top.id);
+          const pageEl = head?.closest('.page');
+          if (!head || !pageEl) {
+            prev = null;
+            continue;
+          }
+          const pr = pageEl.getBoundingClientRect();
+          const r = head.getBoundingClientRect();
+          const pt = { page: pageEl, x: r.left + r.width / 2 - pr.left, y: r.top + r.height / 2 - pr.top };
+          if (prev && prev.page === pageEl && pt.x > prev.x) {
+            let svg = pageEl.querySelector(`svg.melody-overlay[data-line="${lineId}"]`) as SVGSVGElement | null;
+            if (!svg) {
+              svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              svg.setAttribute('class', 'melody-overlay');
+              svg.dataset.line = lineId;
+              Object.assign(svg.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' });
+              pageEl.querySelector('.overlay')?.after(svg);
+            }
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('class', 'melody-path');
+            path.setAttribute('stroke', color);
+            path.setAttribute('d', `M${prev.x},${prev.y} L${pt.x},${pt.y}`);
+            svg.appendChild(path);
+          }
+          prev = pt;
+        }
+      }
+    }
     if (selection.kind === 'event') {
       const id = selection.noteId ?? selection.eventId;
       const el = byId(id) ?? byId(selection.eventId);
       el?.classList.add('nf-sel');
+    } else if (selection.kind === 'span') {
+      for (const e of selectedEvents(score, selection)) byId(svgIdOf(e.ev))?.classList.add('nf-sel');
     } else if (selection.kind === 'range') {
       for (let s = selection.staffFrom; s <= selection.staffTo; s++) {
         for (let m = selection.mFrom; m <= selection.mTo; m++) {
@@ -222,7 +282,7 @@ export function ScoreView() {
         }
       }
     }
-  }, [pages, selection, cursor, inputActive, score, view.zoom]);
+  }, [pages, selection, cursor, inputActive, score, view.zoom, view.showLines]);
 
   // ── scroll to requested measure ──
   useEffect(() => {
@@ -261,8 +321,8 @@ export function ScoreView() {
         const sp = (lines[4].top - lines[0].top) / 4;
         const bottomY = (lines[4].top + lines[4].bottom) / 2;
         const steps = Math.round((bottomY - e.clientY) / (sp / 2));
-        const diatonic = clefBottomLine(clefAt(st.score, staff, measure)) + steps;
         const time = timeAtX(pageEl, st.score, measure, e.clientX);
+        const diatonic = clefBottomLine(clefAt(st.score, staff, measure)) + steps + 7 * ottavaOctaves(st.score, staff, measure, time);
         A.enterNoteAt(staff, measure, time, diatonic, e.shiftKey || e.ctrlKey);
         e.preventDefault();
         return;
@@ -275,7 +335,7 @@ export function ScoreView() {
           // Clicked a stem: select the whole chord.
           noteId = undefined;
         }
-        A.selectElement({ staff: ref.staff, measure: ref.measure, voice: ref.voice, eventId: ref.eventId, noteId });
+        A.selectElement({ staff: ref.staff, measure: ref.measure, voice: ref.voice, eventId: ref.eventId, noteId }, e.shiftKey);
         return;
       }
       if (hitStaff) {

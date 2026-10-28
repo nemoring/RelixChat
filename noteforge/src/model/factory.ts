@@ -71,6 +71,11 @@ export function createPianoScore(opts: NewScoreOptions = {}): Score {
       orientation: 'portrait',
       margins: { top: 15, bottom: 15, left: 15, right: 15 },
       staffScale: 100,
+      measuresPerSystem: 0,
+      staffSpacing: 12,
+      systemSpacing: 12,
+      showPageNumbers: true,
+      showHeader: true,
     },
     measures,
     parts: [
@@ -82,5 +87,8 @@ export function createPianoScore(opts: NewScoreOptions = {}): Score {
         staves: [staff('treble'), staff('bass')],
       },
     ],
+    spanners: [],
+    lines: [{ id: newId('l'), name: 'Мелодия', color: '#d6336c' }],
+    bookmarks: [],
   };
 }

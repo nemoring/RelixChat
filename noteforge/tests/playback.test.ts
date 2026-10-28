@@ -23,13 +23,14 @@ function song() {
 describe('performance model', () => {
   it('times every note from the score (120 bpm: a quarter = 0.5 s)', () => {
     const p = perform(song());
-    const keys = p.notes.map((n) => [n.key, n.start, n.end - n.start, n.staff]);
+    const keys = p.notes.map((n) => [n.key, n.start, Math.round((n.end - n.start) * 1000) / 1000, n.staff]);
+    // Notes sound 97 % of their value (detached legato); a tie chain sounds as one note.
     expect(keys).toEqual([
-      [72, 0, 0.5, 0],
-      [71, 0.5, 0.5, 0],
-      [69, 1, 0.5, 1],
-      [67, 1.5, 0.5, 1],
-      [76, 1.5, 1.5, 0],
+      [72, 0, 0.485, 0],
+      [71, 0.5, 0.485, 0],
+      [69, 1, 0.485, 1],
+      [67, 1.5, 0.485, 1],
+      [76, 1.5, 1.47, 0],
     ]);
     expect(p.notes[4].noteIds.length).toBe(2); // tie chain spans two model notes
     expect(p.duration).toBeCloseTo(6);

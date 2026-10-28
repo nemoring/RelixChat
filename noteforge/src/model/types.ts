@@ -42,18 +42,51 @@ export interface Note {
   tie?: boolean;
 }
 
-export interface ChordEvent {
+export type Articulation = 'staccato' | 'staccatissimo' | 'tenuto' | 'accent' | 'marcato';
+export const ARTICULATIONS: Articulation[] = ['staccato', 'staccatissimo', 'tenuto', 'accent', 'marcato'];
+
+export type Ornament = 'trill' | 'mordent' | 'invertedMordent' | 'turn' | 'invertedTurn';
+export const ORNAMENTS: Ornament[] = ['trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'];
+
+export type Dynamic = 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff' | 'sf' | 'sfz' | 'fp' | 'rfz';
+export const DYNAMICS: Dynamic[] = ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'sf', 'sfz', 'fp', 'rfz'];
+
+/** Rhythmic group: `num` notes in the time of `den` (triplet = 3:2, quintuplet = 5:4). */
+export interface Tuplet {
+  /** Shared by all members of one group. */
   id: string;
-  type: 'chord';
-  dur: Duration;
-  /** One or more notes sounding together (sorted low → high). */
-  notes: Note[];
+  num: number;
+  den: number;
 }
 
-export interface RestEvent {
+interface EventBase {
   id: string;
-  type: 'rest';
   dur: Duration;
+  tuplet?: Tuplet;
+  fermata?: boolean;
+}
+
+export interface ChordEvent extends EventBase {
+  type: 'chord';
+  /** One or more notes sounding together (sorted low → high). */
+  notes: Note[];
+  artics?: Articulation[];
+  ornament?: Ornament;
+  /** Grace note: takes no metric time and belongs to the following event. */
+  grace?: 'acciaccatura' | 'appoggiatura';
+  /** Dynamic marking starting at this event (applies to the whole part). */
+  dynamic?: Dynamic;
+  /** Cross-staff notation: drawn on the staff `staffShift` below (+1) / above (-1). */
+  staffShift?: number;
+  stem?: 'up' | 'down';
+  /** Manual beaming: start a new beam, join with the previous event, or no beam. */
+  beam?: 'break' | 'join' | 'none';
+  /** Melody line this event belongs to (see Score.lines). */
+  line?: string;
+}
+
+export interface RestEvent extends EventBase {
+  type: 'rest';
 }
 
 export type VoiceEvent = ChordEvent | RestEvent;
@@ -63,6 +96,8 @@ export const MAX_VOICES = 4;
 export interface StaffMeasure {
   /** Index = voice number - 1. An empty array means the voice is unused in this measure. */
   voices: VoiceEvent[][];
+  /** Clef change at the start of this measure. */
+  clef?: ClefKind;
 }
 
 export type ClefKind = 'treble' | 'bass' | 'alto' | 'tenor' | 'treble8vb' | 'percussion';
@@ -90,12 +125,62 @@ export interface TimeSig {
   symbol?: 'common' | 'cut';
 }
 
+export type JumpKind = 'DC' | 'DCalFine' | 'DCalCoda' | 'DS' | 'DSalFine' | 'DSalCoda';
+export type MarkerKind = 'segno' | 'coda' | 'fine' | 'toCoda';
+
 export interface MeasureInfo {
   id: string;
   /** Time signature change starting at this measure (always set on measure 1). */
   timeSig?: TimeSig;
   /** Key signature change (circle of fifths: -7 … +7) starting at this measure. */
   keySig?: number;
+  /** Tempo change at the start of this measure. */
+  tempo?: Tempo;
+  /** Start repeat barline. */
+  repeatStart?: boolean;
+  /** End repeat barline; the value is how many times the section is played (2 = one repeat). */
+  repeatEnd?: number;
+  /** Volta (1st/2nd ending) bracket over this measure; consecutive measures with the same id form one bracket. */
+  volta?: { id: string; numbers: number[] };
+  /** Navigation marker in this measure. */
+  marker?: MarkerKind;
+  /** Jump instruction at the end of this measure. */
+  jump?: JumpKind;
+  /** Right barline style (repeat barlines take precedence). */
+  barline?: 'double' | 'final';
+  /** Start of a movement / section of the work. */
+  section?: { title: string; newPage: boolean };
+  /** Rehearsal mark text (A, B, …). */
+  rehearsal?: string;
+  /** Forced system or page break before this measure. */
+  breakBefore?: 'system' | 'page';
+}
+
+export type SpannerType = 'slur' | 'cresc' | 'dim' | 'pedal' | 'ottava';
+
+/** Line-like markings anchored to a start and an end event. */
+export interface Spanner {
+  id: string;
+  type: SpannerType;
+  /** Event id where the spanner starts (inclusive). */
+  start: string;
+  /** Event id where the spanner ends (inclusive). */
+  end: string;
+  /** Octave line: +8/+15 above (8va/15ma), -8/-15 below (8vb/15mb). */
+  ottava?: number;
+}
+
+/** A melodic line that may wander between hands, voices and staves. */
+export interface MelodyLine {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface Bookmark {
+  id: string;
+  name: string;
+  measure: number;
 }
 
 export interface ScoreMeta {
@@ -116,6 +201,13 @@ export interface PageLayout {
   margins: { top: number; bottom: number; left: number; right: number };
   /** Engraving scale in percent (staff size). */
   staffScale: number;
+  /** Fixed number of measures per system (0 = automatic). */
+  measuresPerSystem: number;
+  /** Extra space between staves / systems (Verovio units, defaults 12 / 12). */
+  staffSpacing: number;
+  systemSpacing: number;
+  showPageNumbers: boolean;
+  showHeader: boolean;
 }
 
 export interface Tempo {
@@ -133,6 +225,9 @@ export interface Score {
   layout: PageLayout;
   measures: MeasureInfo[];
   parts: Part[];
+  spanners: Spanner[];
+  lines: MelodyLine[];
+  bookmarks: Bookmark[];
 }
 
 /** File envelope of a .nfg project. */

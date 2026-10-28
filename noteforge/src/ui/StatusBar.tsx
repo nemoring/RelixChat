@@ -4,6 +4,7 @@ import { keyName, pitchName } from '../model/pitch';
 import { durationName } from '../model/duration';
 import { div, fracToString, add, frac } from '../model/fraction';
 import * as A from '../state/actions';
+import { selectedEvents } from '../state/selection';
 
 function beatLabel(pos: { n: number; d: number }, unit: number): string {
   // 1-based beat number in units of the time signature denominator.
@@ -28,8 +29,22 @@ export function StatusBar() {
     }
   } else if (selection.kind === 'range') {
     pos = `Такты ${selection.mFrom + 1}–${selection.mTo + 1} · нотоносцы ${selection.staffFrom + 1}–${selection.staffTo + 1}`;
+  } else if (selection.kind === 'span') {
+    const n = selectedEvents(score, selection).filter((e) => e.ev.type === 'chord').length;
+    const a = Math.min(selection.anchor.measure, selection.focus.measure) + 1;
+    const b = Math.max(selection.anchor.measure, selection.focus.measure) + 1;
+    pos = `Фрагмент: ${n} нот/аккордов · такты ${a}–${b}${selection.anchor.staff !== selection.focus.staff ? ' · обе руки' : ''}`;
   }
-  const m = input.active && cursor ? cursor.measure : selection.kind === 'event' ? selection.measure : selection.kind === 'range' ? selection.mFrom : 0;
+  const m =
+    input.active && cursor
+      ? cursor.measure
+      : selection.kind === 'event'
+        ? selection.measure
+        : selection.kind === 'range'
+          ? selection.mFrom
+          : selection.kind === 'span'
+            ? Math.min(selection.anchor.measure, selection.focus.measure)
+            : 0;
   const ts = timeSigAt(score, m);
   return (
     <footer className="statusbar">

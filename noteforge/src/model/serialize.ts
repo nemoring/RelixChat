@@ -1,9 +1,9 @@
 /**
  * .nfg project files: JSON envelope + structural validation + repair.
  */
-import type { ProjectFile, Score, VoiceEvent, TimeSig } from './types';
-import { FORMAT_VERSION, MAX_VOICES, STEPS } from './types';
-import { isValidDuration, durToFrac, measureLength, decomposeNote } from './duration';
+import type { MeasureInfo, ProjectFile, Score, VoiceEvent, TimeSig } from './types';
+import { ARTICULATIONS, DYNAMICS, FORMAT_VERSION, MAX_VOICES, ORNAMENTS, STEPS } from './types';
+import { isValidDuration, eventLen, measureLength, decomposeNote } from './duration';
 import { add, cmp, lt, sub, ZERO, le } from './fraction';
 import { restsFor } from './factory';
 import { newId } from './ids';
@@ -70,8 +70,12 @@ export function validateScore(raw: unknown): LoadResult {
   if (![1, 2, 4, 8, 16].includes(score.tempo.beatUnit)) score.tempo.beatUnit = 4;
   if (!isInt(score.tempo.beatDots) || score.tempo.beatDots < 0 || score.tempo.beatDots > 2) score.tempo.beatDots = 0;
   if (!isObj(score.layout)) {
-    score.layout = { size: 'A4', orientation: 'portrait', margins: { top: 15, bottom: 15, left: 15, right: 15 }, staffScale: 100 };
+    score.layout = { ...DEFAULT_LAYOUT, margins: { ...DEFAULT_LAYOUT.margins } };
     repaired.push('Параметры страницы восстановлены по умолчанию.');
+  }
+  for (const [k, v] of Object.entries(DEFAULT_LAYOUT)) {
+    const cur = (score.layout as unknown as Record<string, unknown>)[k];
+    if (typeof cur !== typeof v) (score.layout as unknown as Record<string, unknown>)[k] = structuredClone(v);
   }
   if (!['A4', 'A3', 'Letter'].includes(score.layout.size)) score.layout.size = 'A4';
   if (!['portrait', 'landscape'].includes(score.layout.orientation)) score.layout.orientation = 'portrait';
@@ -95,6 +99,7 @@ export function validateScore(raw: unknown): LoadResult {
     m.id = uniq(m.id, 'measure');
     if (m.timeSig !== undefined && !validTimeSig(m.timeSig)) return fail(`Такт ${i + 1}: некорректный размер.`);
     if (m.keySig !== undefined && (!isInt(m.keySig) || m.keySig < -7 || m.keySig > 7)) return fail(`Такт ${i + 1}: некорректная тональность.`);
+    sanitizeMeasure(m, repaired, i);
   }
   if (!score.measures[0].timeSig) {
     score.measures[0].timeSig = { count: 4, unit: 4 };
@@ -120,10 +125,11 @@ export function validateScore(raw: unknown): LoadResult {
       const where = `Партия ${pi + 1}, нотоносец ${si + 1}`;
       if (!isObj(staff) || !Array.isArray(staff.measures)) return fail(`${where}: повреждённые данные.`);
       staff.id = uniq(staff.id, 'staff');
-      if (!['treble', 'bass', 'alto', 'tenor', 'treble8vb', 'percussion'].includes(staff.clef)) staff.clef = si === 1 ? 'bass' : 'treble';
+      if (!CLEFS.includes(staff.clef)) staff.clef = si === 1 ? 'bass' : 'treble';
       if (staff.measures.length !== score.measures.length) return fail(`${where}: число тактов (${staff.measures.length}) не совпадает с партитурой (${score.measures.length}).`);
       for (const [mi, sm] of staff.measures.entries()) {
         if (!isObj(sm) || !Array.isArray(sm.voices)) return fail(`${where}, такт ${mi + 1}: повреждённые данные.`);
+        if (sm.clef !== undefined && !CLEFS.includes(sm.clef)) delete sm.clef;
         while (sm.voices.length < MAX_VOICES) sm.voices.push([]);
         if (sm.voices.length > MAX_VOICES) sm.voices.length = MAX_VOICES;
         const mlen = measureLength(sigs[mi]);
@@ -134,6 +140,7 @@ export function validateScore(raw: unknown): LoadResult {
             if (!isObj(ev) || (ev.type !== 'rest' && ev.type !== 'chord')) return fail(`${where}, такт ${mi + 1}: неизвестное событие.`);
             if (!isValidDuration(ev.dur)) return fail(`${where}, такт ${mi + 1}: некорректная длительность.`);
             ev.id = uniq(ev.id, 'event');
+            sanitizeEvent(ev);
             if (ev.type === 'chord') {
               if (!Array.isArray(ev.notes) || ev.notes.length === 0) return fail(`${where}, такт ${mi + 1}: пустой аккорд.`);
               for (const n of ev.notes) {
@@ -161,7 +168,86 @@ export function validateScore(raw: unknown): LoadResult {
       }
     }
   }
+  // Spanners, melody lines, bookmarks.
+  const eventIds = new Set<string>();
+  for (const part of score.parts) for (const st of part.staves) for (const sm of st.measures) for (const v of sm.voices) for (const ev of v) eventIds.add(ev.id);
+  if (!Array.isArray(score.spanners)) score.spanners = [];
+  const before = score.spanners.length;
+  score.spanners = score.spanners.filter(
+    (sp) => isObj(sp) && isStr(sp.id) && SPANNERS.includes(sp.type) && eventIds.has(sp.start) && eventIds.has(sp.end) && (sp.type !== 'ottava' || [8, 15, -8, -15].includes(sp.ottava as number)),
+  );
+  if (score.spanners.length !== before) repaired.push(`Удалено повреждённых линий (лиг, вилок, педали): ${before - score.spanners.length}.`);
+  if (!Array.isArray(score.lines)) score.lines = [];
+  score.lines = score.lines.filter((l) => isObj(l) && isStr(l.id) && isStr(l.name) && isStr(l.color));
+  const lineIds = new Set(score.lines.map((l) => l.id));
+  for (const part of score.parts)
+    for (const st of part.staves)
+      for (const sm of st.measures)
+        for (const v of sm.voices)
+          for (const ev of v) if (ev.type === 'chord' && ev.line && !lineIds.has(ev.line)) delete ev.line;
+  if (!Array.isArray(score.bookmarks)) score.bookmarks = [];
+  score.bookmarks = score.bookmarks.filter((b) => isObj(b) && isStr(b.id) && isStr(b.name) && isInt(b.measure) && b.measure >= 0 && b.measure < score.measures.length);
   return { score, errors, repaired };
+}
+
+const DEFAULT_LAYOUT = {
+  size: 'A4' as const,
+  orientation: 'portrait' as const,
+  margins: { top: 15, bottom: 15, left: 15, right: 15 },
+  staffScale: 100,
+  measuresPerSystem: 0,
+  staffSpacing: 12,
+  systemSpacing: 12,
+  showPageNumbers: true,
+  showHeader: true,
+};
+
+const CLEFS = ['treble', 'bass', 'alto', 'tenor', 'treble8vb', 'percussion'];
+const SPANNERS = ['slur', 'cresc', 'dim', 'pedal', 'ottava'];
+
+/** Drops unknown or malformed measure marks instead of rejecting the file. */
+function sanitizeMeasure(m: MeasureInfo, repaired: string[], i: number) {
+  const bad = (what: string) => repaired.push(`Такт ${i + 1}: удалена некорректная отметка (${what}).`);
+  if (m.tempo !== undefined && !(isObj(m.tempo) && typeof m.tempo.bpm === 'number' && m.tempo.bpm >= 10 && m.tempo.bpm <= 500 && [1, 2, 4, 8, 16].includes(m.tempo.beatUnit))) {
+    delete m.tempo;
+    bad('темп');
+  } else if (m.tempo) {
+    if (!isStr(m.tempo.text)) m.tempo.text = '';
+    if (!isInt(m.tempo.beatDots)) m.tempo.beatDots = 0;
+  }
+  if (m.repeatStart !== undefined && m.repeatStart !== true) delete m.repeatStart;
+  if (m.repeatEnd !== undefined && !(isInt(m.repeatEnd) && m.repeatEnd >= 2 && m.repeatEnd <= 16)) {
+    delete m.repeatEnd;
+    bad('реприза');
+  }
+  if (m.volta !== undefined && !(isObj(m.volta) && isStr(m.volta.id) && Array.isArray(m.volta.numbers) && m.volta.numbers.every(isInt))) {
+    delete m.volta;
+    bad('вольта');
+  }
+  if (m.marker !== undefined && !['segno', 'coda', 'fine', 'toCoda'].includes(m.marker)) delete m.marker;
+  if (m.jump !== undefined && !['DC', 'DCalFine', 'DCalCoda', 'DS', 'DSalFine', 'DSalCoda'].includes(m.jump)) delete m.jump;
+  if (m.barline !== undefined && !['double', 'final'].includes(m.barline)) delete m.barline;
+  if (m.section !== undefined && !(isObj(m.section) && isStr(m.section.title))) delete m.section;
+  else if (m.section) m.section.newPage = !!m.section.newPage;
+  if (m.rehearsal !== undefined && !isStr(m.rehearsal)) delete m.rehearsal;
+  if (m.breakBefore !== undefined && !['system', 'page'].includes(m.breakBefore)) delete m.breakBefore;
+}
+
+function sanitizeEvent(ev: VoiceEvent) {
+  if (ev.tuplet !== undefined && !(isObj(ev.tuplet) && isStr(ev.tuplet.id) && isInt(ev.tuplet.num) && isInt(ev.tuplet.den) && ev.tuplet.num >= 2 && ev.tuplet.den >= 1)) delete ev.tuplet;
+  if (ev.fermata !== undefined && ev.fermata !== true) delete ev.fermata;
+  if (ev.type !== 'chord') return;
+  if (ev.artics !== undefined) {
+    ev.artics = Array.isArray(ev.artics) ? ev.artics.filter((a) => ARTICULATIONS.includes(a)) : [];
+    if (!ev.artics.length) delete ev.artics;
+  }
+  if (ev.ornament !== undefined && !ORNAMENTS.includes(ev.ornament)) delete ev.ornament;
+  if (ev.dynamic !== undefined && !DYNAMICS.includes(ev.dynamic)) delete ev.dynamic;
+  if (ev.grace !== undefined && ev.grace !== 'acciaccatura' && ev.grace !== 'appoggiatura') delete ev.grace;
+  if (ev.staffShift !== undefined && !(isInt(ev.staffShift) && Math.abs(ev.staffShift) <= 3 && ev.staffShift !== 0)) delete ev.staffShift;
+  if (ev.stem !== undefined && ev.stem !== 'up' && ev.stem !== 'down') delete ev.stem;
+  if (ev.beam !== undefined && !['break', 'join', 'none'].includes(ev.beam)) delete ev.beam;
+  if (ev.line !== undefined && !isStr(ev.line)) delete ev.line;
 }
 
 /** Pads an underfull voice with rests or trims an overfull one; null if already correct. */
@@ -169,7 +255,7 @@ export function fitVoice(events: VoiceEvent[], mlen: { n: number; d: number }): 
   let t = ZERO;
   const out: VoiceEvent[] = [];
   for (const ev of events) {
-    const len = durToFrac(ev.dur);
+    const len = eventLen(ev);
     const end = add(t, len);
     if (le(end, mlen)) {
       out.push(ev);
@@ -178,6 +264,16 @@ export function fitVoice(events: VoiceEvent[], mlen: { n: number; d: number }): 
     }
     // Overfull: shorten the event that crosses the barline and drop the rest.
     const left = sub(mlen, t);
+    if (lt(ZERO, left) && ev.tuplet) {
+      // A cut tuplet cannot stay a tuplet: drop its members from here on.
+      while (out.length && out[out.length - 1].tuplet?.id === ev.tuplet.id) {
+        const removed = out.pop()!;
+        t = sub(t, eventLen(removed));
+      }
+      out.push(...restsFor(t, sub(mlen, t)));
+      t = mlen;
+      break;
+    }
     if (lt(ZERO, left)) {
       decomposeNote(t, left).forEach((d, i) => {
         if (i === 0) out.push({ ...ev, dur: d } as VoiceEvent);
