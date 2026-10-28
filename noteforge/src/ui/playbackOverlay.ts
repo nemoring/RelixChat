@@ -34,7 +34,7 @@ function staffLineRects(el: Element): DOMRect[] {
     .map((l) => l.getBoundingClientRect());
 }
 
-function measureGeometry(root: HTMLElement, m: number): Omit<Geometry, 'gen'> | null {
+export function measureGeometry(root: HTMLElement, m: number): Omit<Geometry, 'gen'> | null {
   const score = getState().score;
   const n = staffCount(score);
   const first = root.querySelector(`[id="${staffSvgId(0, m)}"]`);

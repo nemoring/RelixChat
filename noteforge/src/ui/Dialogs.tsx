@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useStore, getState } from '../state/store';
+import { useStore, getState, setState } from '../state/store';
 import * as A from '../state/actions';
-import { commands } from '../input/commands';
 import { keyName } from '../model/pitch';
 import { computeStats, formatDuration } from '../model/stats';
 import { APP_VERSION } from '../model/serialize';
 import { Mixer } from './Transport';
 import { PrintPreview } from './PrintPreview';
+import { Navigator } from './Navigator';
+import * as NAV from '../state/navigation';
+import * as AS from '../state/autosave';
+import { checkScore, fixIssues } from '../model/check';
+import { commands, defaultKeys, applyShortcutOverrides, captureNextShortcut, commandForKey } from '../input/commands';
+import { useSettings, updateSettings, getSettings, type Snap } from '../state/settings';
+import { midiInputs } from '../input/midiInput';
+import { player } from '../playback/player';
 import * as P from '../state/playback';
 import * as N from '../state/notation';
 import { selectedMeasure } from '../state/actions';
@@ -475,6 +482,232 @@ function RepeatTimesDialog() {
   );
 }
 
+function RecoveryDialog() {
+  const list = useStore((s) => s.recovery);
+  const done = async (keys: string[]) => {
+    await AS.discardRecovery(keys);
+    setState({ recovery: [], dialog: { kind: 'none' } });
+  };
+  return (
+    <Modal title="Восстановление после аварийного завершения">
+      <p className="hint">NoteForge в прошлый раз закрылся некорректно. Найдены автоматически сохранённые копии:</p>
+      {list.map((r) => (
+        <div key={r.key} className="issue">
+          <span className="t">
+            <b>{r.title}</b>
+            <br />
+            <small>{new Date(r.savedAt).toLocaleString()} {r.filePath ? `· ${r.filePath}` : '· не сохранялась'}</small>
+          </span>
+          <button type="button" className="small on" onClick={async () => {
+            await AS.recover(r.key, r.filePath);
+            await done(list.filter((x) => x.key !== r.key).map((x) => x.key));
+          }}>
+            Восстановить
+          </button>
+        </div>
+      ))}
+      <div className="melody-actions">
+        <button type="button" className="small" onClick={() => void done(list.map((x) => x.key))}>
+          Удалить все копии
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function SectionDialog() {
+  const m = selectedMeasure() ?? 0;
+  const cur = getState().score.measures[m]?.section;
+  const [title, setTitle] = useState(cur?.title ?? '');
+  const [newPage, setNewPage] = useState(cur?.newPage ?? false);
+  return (
+    <Modal title={`Часть / раздел с такта ${m + 1}`} submitLabel="Применить" onSubmit={() => {
+      A.closeDialog();
+      NAV.setSection(title.trim(), newPage, m);
+    }}>
+      <Field label="Название (пусто — убрать раздел)">
+        <input value={title} placeholder="II. Adagio sostenuto" onChange={(e) => setTitle(e.target.value)} />
+      </Field>
+      <label className="field check-row">
+        <input type="checkbox" checked={newPage} onChange={(e) => setNewPage(e.target.checked)} /> Начинать с новой страницы
+      </label>
+    </Modal>
+  );
+}
+
+function BookmarkDialog() {
+  const m = selectedMeasure() ?? 0;
+  const [name, setName] = useState(`Такт ${m + 1}`);
+  return (
+    <Modal title="Закладка" submitLabel="Добавить" onSubmit={() => {
+      A.closeDialog();
+      NAV.addBookmark(name.trim(), m);
+    }}>
+      <Field label={`Название закладки на такте ${m + 1}`}>
+        <input value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+    </Modal>
+  );
+}
+
+function CheckDialog() {
+  const score = useStore((s) => s.score);
+  const issues = useMemo(() => checkScore(score), [score]);
+  const fixable = issues.filter((i) => i.kind === 'underfull' || i.kind === 'overfull' || i.kind === 'tie');
+  const shown = issues.slice(0, 300);
+  return (
+    <Modal title="Проверка тактов" wide>
+      <p className="hint">
+        Ошибок: {issues.filter((i) => i.severity === 'error').length} · предупреждений: {issues.filter((i) => i.severity === 'warning').length} · пустых тактов:{' '}
+        {issues.filter((i) => i.kind === 'empty').length}
+      </p>
+      <div className="issues">
+        {issues.length === 0 && <p>Проблем не найдено.</p>}
+        {shown.map((i, k) => (
+          <div key={k} className="issue">
+            <span className={`sev ${i.severity}`} />
+            <span className="t">{i.text}</span>
+            <button type="button" className="small" onClick={() => NAV.goTo(i.measure)}>
+              Перейти
+            </button>
+          </div>
+        ))}
+        {issues.length > shown.length && <p className="hint">… и ещё {issues.length - shown.length}</p>}
+      </div>
+      {fixable.length > 0 && (
+        <div className="melody-actions">
+          <button type="button" className="small on" onClick={() => A.updateScore('Исправление тактов', (d) => void fixIssues(d, fixable))}>
+            Исправить автоматически ({fixable.length})
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function ShortcutsEditDialog() {
+  const overrides = useSettings((s) => s.shortcuts);
+  const [capturing, setCapturing] = useState<string | null>(null);
+  const [filter, setFilter] = useState('');
+  const [, force] = useState(0);
+  useEffect(() => () => captureNextShortcut(null), []);
+  const set = (id: string, keys: string[]) => {
+    const next = { ...getSettings().shortcuts, [id]: keys };
+    updateSettings({ shortcuts: next });
+    applyShortcutOverrides(next);
+    force((x) => x + 1);
+  };
+  const reset = (id: string) => {
+    const next = { ...getSettings().shortcuts };
+    delete next[id];
+    updateSettings({ shortcuts: next });
+    applyShortcutOverrides(next);
+    force((x) => x + 1);
+  };
+  const list = [...commands.values()].filter((c) => !filter || c.label.toLowerCase().includes(filter.toLowerCase()) || c.group.toLowerCase().includes(filter.toLowerCase()));
+  return (
+    <Modal title="Горячие клавиши" wide>
+      <p className="hint">Нажмите «изменить» и затем нужное сочетание клавиш. Клавиша, занятая другой командой, будет снята с неё.</p>
+      <Field label="Поиск">
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} />
+      </Field>
+      <div className="issues shortcut-edit">
+        {list.map((c) => (
+          <div key={c.id} style={{ display: 'contents' }}>
+            <span>
+              {c.label} <small className="hint-inline">· {c.group}</small>
+            </span>
+            <kbd className={capturing === c.id ? 'capturing' : ''}>{capturing === c.id ? 'нажмите клавиши…' : c.keys.join(' / ') || '—'}</kbd>
+            <span>
+              <button type="button" className="small" onClick={() => {
+                setCapturing(c.id);
+                captureNextShortcut((sc) => {
+                  setCapturing(null);
+                  if (sc === 'Escape') return;
+                  const owner = commandForKey(sc);
+                  if (owner && owner.id !== c.id && !window.confirm(`«${sc}» уже назначено команде «${owner.label}». Переназначить?`)) return;
+                  set(c.id, [sc]);
+                });
+              }}>
+                изменить
+              </button>{' '}
+              <button type="button" className="small" onClick={() => set(c.id, [])} title="Без клавиши">
+                ×
+              </button>{' '}
+              {overrides[c.id] && (
+                <button type="button" className="small" onClick={() => reset(c.id)} title={`По умолчанию: ${(defaultKeys.get(c.id) ?? []).join(' / ') || '—'}`}>
+                  сброс
+                </button>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+function SettingsDialog() {
+  const st = useSettings((s) => s);
+  const preview = usePlayerPreview();
+  const inputs = midiInputs();
+  return (
+    <Modal title="Настройки">
+      <Field label="Автосохранение">
+        <select value={st.autosaveMinutes} onChange={(e) => {
+          updateSettings({ autosaveMinutes: Number(e.target.value) });
+          AS.startAutosave();
+        }}>
+          <option value={0}>Выключено</option>
+          <option value={1}>Каждую минуту</option>
+          <option value={2}>Каждые 2 минуты</option>
+          <option value={5}>Каждые 5 минут</option>
+          <option value={10}>Каждые 10 минут</option>
+        </select>
+      </Field>
+      <Field label="MIDI-клавиатура для ввода нот">
+        <select value={st.midiInput} onChange={(e) => updateSettings({ midiInput: e.target.value })}>
+          <option value="all">Все подключённые устройства</option>
+          <option value="none">Не использовать</option>
+          {inputs.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <p className="hint">{inputs.length ? `Найдено MIDI-входов: ${inputs.length}` : 'MIDI-устройства ввода не найдены (подключите клавиатуру — список обновится).'}</p>
+      <Field label="Сетка при вводе нот мышью">
+        <select value={String(st.snap)} onChange={(e) => updateSettings({ snap: (e.target.value === 'note' ? 'note' : Number(e.target.value)) as Snap })}>
+          <option value="note">По существующим нотам</option>
+          <option value="4">Четверти</option>
+          <option value="8">Восьмые</option>
+          <option value="16">Шестнадцатые</option>
+          <option value="32">Тридцать вторые</option>
+        </select>
+      </Field>
+      <label className="field check-row">
+        <input type="checkbox" checked={st.showKeyboard} onChange={(e) => updateSettings({ showKeyboard: e.target.checked })} /> Экранная клавиатура фортепиано
+      </label>
+      <label className="field check-row">
+        <input type="checkbox" checked={preview} onChange={(e) => player.setPreview(e.target.checked)} /> Проигрывать ноты при вводе и выделении
+      </label>
+      <button type="button" className="small" onClick={() => A.openDialog('shortcutsEdit')}>
+        Горячие клавиши…
+      </button>
+    </Modal>
+  );
+}
+
+function usePlayerPreview() {
+  const [v, setV] = useState(player.state.previewNotes);
+  useEffect(() => {
+    const off = player.subscribe(() => setV(player.state.previewNotes));
+    return () => void off();
+  }, []);
+  return v;
+}
+
 function MessageDialog() {
   const msg = useStore((s) => s.dialog.message);
   return (
@@ -530,6 +763,24 @@ export function Dialogs() {
       return <MessageDialog />;
     case 'preview':
       return <PrintPreview />;
+    case 'recovery':
+      return <RecoveryDialog />;
+    case 'section':
+      return <SectionDialog />;
+    case 'bookmark':
+      return <BookmarkDialog />;
+    case 'checkMeasures':
+      return <CheckDialog />;
+    case 'shortcutsEdit':
+      return <ShortcutsEditDialog />;
+    case 'settings':
+      return <SettingsDialog />;
+    case 'navigator':
+      return (
+        <Modal title="Навигатор">
+          <Navigator />
+        </Modal>
+      );
     case 'tempo':
       return <TempoDialog />;
     case 'tuplet':

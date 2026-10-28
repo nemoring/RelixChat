@@ -51,7 +51,7 @@ export interface ViewState {
 }
 
 export interface Dialog {
-  kind: 'none' | 'scoreInfo' | 'newScore' | 'timeSig' | 'measures' | 'gotoMeasure' | 'stats' | 'shortcuts' | 'about' | 'message' | 'mixer' | 'tempo' | 'tuplet' | 'transpose' | 'volta' | 'repeatTimes' | 'preview';
+  kind: 'none' | 'scoreInfo' | 'newScore' | 'timeSig' | 'measures' | 'gotoMeasure' | 'stats' | 'shortcuts' | 'about' | 'message' | 'mixer' | 'tempo' | 'tuplet' | 'transpose' | 'volta' | 'repeatTimes' | 'preview' | 'recovery' | 'navigator' | 'section' | 'bookmark' | 'shortcutsEdit' | 'checkMeasures' | 'settings';
   message?: { title: string; text: string };
 }
 
@@ -74,11 +74,17 @@ export interface AppState {
   status: string;
   /** Measure index the score view should scroll to (incremented token forces re-scroll). */
   reveal: { measure: number; token: number } | null;
+  /** Identifies the open document for autosave. */
+  docKey: string;
+  /** Autosaves offered for recovery after a crash. */
+  recovery: { key: string; title: string; filePath: string | null; savedAt: string }[];
   /** Long-running export in progress (shown as a modal progress bar). */
   exportProgress: { text: string; progress: number | null } | null;
 }
 
 const HISTORY_LIMIT = 500;
+
+const newDocKey = () => `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
 function initialState(): AppState {
   const score = createPianoScore();
@@ -96,6 +102,8 @@ function initialState(): AppState {
     status: 'Готово',
     reveal: null,
     exportProgress: null,
+    docKey: newDocKey(),
+    recovery: [],
   };
 }
 
@@ -182,8 +190,9 @@ export function loadDocument(score: Score, filePath: string | null): void {
     future: [],
     selection: { kind: 'none' },
     cursor: null,
-    input: { ...state.input, active: false },
+    input: { ...state.input, active: false, line: null },
     reveal: { measure: 0, token: Date.now() },
+    docKey: newDocKey(),
   });
 }
 

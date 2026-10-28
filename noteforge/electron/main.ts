@@ -70,7 +70,8 @@ app.on('second-instance', () => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await startSession();
   protocol.handle('app', (req) => {
     const url = new URL(req.url);
     const rel = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html';
@@ -86,6 +87,13 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => app.quit());
+let ending = false;
+app.on('will-quit', (e) => {
+  if (ending) return;
+  e.preventDefault();
+  ending = true;
+  void endSession().finally(() => app.quit());
+});
 
 // ───────────── IPC ─────────────
 
@@ -251,6 +259,77 @@ ipcMain.handle('print:finish', async (_e, id: string, action: 'pdf' | 'print', s
     pw.destroy();
     await fs.rm(j.file, { force: true });
   }
+});
+
+// ───────────── settings, autosave & crash recovery ─────────────
+
+const userDir = () => app.getPath('userData');
+const settingsFile = () => path.join(userDir(), 'settings.json');
+const autosaveDir = () => path.join(userDir(), 'autosave');
+const sessionFile = () => path.join(userDir(), 'session.lock');
+/** Set when the previous run did not shut down cleanly. */
+let crashedLastTime = false;
+
+async function startSession() {
+  await fs.mkdir(autosaveDir(), { recursive: true });
+  crashedLastTime = existsSync(sessionFile());
+  await fs.writeFile(sessionFile(), JSON.stringify({ pid: process.pid, started: new Date().toISOString() }));
+}
+
+async function endSession() {
+  // Clean exit: autosaves of this session are no longer needed.
+  try {
+    const files = await fs.readdir(autosaveDir());
+    await Promise.all(files.map((f) => fs.rm(path.join(autosaveDir(), f), { force: true })));
+    await fs.rm(sessionFile(), { force: true });
+  } catch {
+    /* ignore */
+  }
+}
+
+ipcMain.handle('settings:get', async () => {
+  try {
+    return JSON.parse(await fs.readFile(settingsFile(), 'utf8'));
+  } catch {
+    return {};
+  }
+});
+ipcMain.handle('settings:set', async (_e, value: unknown) => {
+  await fs.mkdir(userDir(), { recursive: true });
+  await fs.writeFile(`${settingsFile()}.tmp`, JSON.stringify(value, null, 1));
+  await fs.rename(`${settingsFile()}.tmp`, settingsFile());
+});
+
+const safeKey = (k: string) => k.replace(/[^\w-]/g, '').slice(0, 64) || 'doc';
+ipcMain.handle('autosave:write', async (_e, key: string, content: string, meta: unknown) => {
+  const base = path.join(autosaveDir(), safeKey(key));
+  await fs.writeFile(`${base}.nfg.tmp`, content, 'utf8');
+  await fs.rename(`${base}.nfg.tmp`, `${base}.nfg`);
+  await fs.writeFile(`${base}.json`, JSON.stringify({ ...(meta as object), savedAt: new Date().toISOString() }));
+});
+ipcMain.handle('autosave:clear', async (_e, key: string) => {
+  const base = path.join(autosaveDir(), safeKey(key));
+  await fs.rm(`${base}.nfg`, { force: true });
+  await fs.rm(`${base}.json`, { force: true });
+});
+/** Autosaves left over from a crashed session. */
+ipcMain.handle('autosave:recoverable', async () => {
+  if (!crashedLastTime) return [];
+  const out: unknown[] = [];
+  for (const f of await fs.readdir(autosaveDir())) {
+    if (!f.endsWith('.json')) continue;
+    try {
+      const meta = JSON.parse(await fs.readFile(path.join(autosaveDir(), f), 'utf8'));
+      out.push({ key: f.replace(/\.json$/, ''), ...meta });
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
+});
+ipcMain.handle('autosave:read', async (_e, key: string) => fs.readFile(path.join(autosaveDir(), `${safeKey(key)}.nfg`), 'utf8'));
+ipcMain.handle('autosave:discardRecovered', async () => {
+  crashedLastTime = false;
 });
 
 ipcMain.on('doc:state', (_e, title: string, isDirty: boolean) => {

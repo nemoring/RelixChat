@@ -9,6 +9,9 @@ import * as P from '../state/playback';
 import * as N from '../state/notation';
 import * as PR from '../state/printing';
 import * as IO from '../state/io';
+import * as NAV from '../state/navigation';
+import { updateSettings, getSettings } from '../state/settings';
+import { autosaveNow } from '../state/autosave';
 import { player } from '../playback/player';
 import { getState } from '../state/store';
 import type { DurBase, Step } from '../model/types';
@@ -175,6 +178,19 @@ const list: Command[] = [
   { id: 'export.musicxml', label: 'Экспорт в MusicXML…', keys: [], group: 'Файл', run: () => void IO.exportMusicXml() },
   { id: 'export.midi', label: 'Экспорт в MIDI…', keys: [], group: 'Файл', run: () => void P.exportMidi() },
   { id: 'export.wav', label: 'Экспорт в WAV…', keys: [], group: 'Файл', run: () => void P.exportWav() },
+  // Navigation & long works (stage 5)
+  { id: 'nav.section', label: 'Новая часть / раздел…', keys: [], group: 'Навигация', run: () => A.openDialog('section') },
+  { id: 'nav.rehearsal', label: 'Буква-ориентир', keys: ['Ctrl+Shift+R'], group: 'Навигация', run: NAV.toggleRehearsal },
+  { id: 'nav.bookmark', label: 'Добавить закладку…', keys: ['Ctrl+D'], group: 'Навигация', run: () => A.openDialog('bookmark') },
+  { id: 'nav.navigator', label: 'Навигатор по произведению', keys: [], group: 'Навигация', run: () => A.openDialog('navigator') },
+  { id: 'file.autosave', label: 'Сохранить автокопию сейчас', keys: [], group: 'Файл', run: () => void autosaveNow() },
+  { id: 'tools.check', label: 'Проверка тактов…', keys: [], group: 'Инструменты', run: () => A.openDialog('checkMeasures') },
+  { id: 'tools.keyboard', label: 'Экранная клавиатура', keys: ['F11'], group: 'Инструменты', run: () => updateSettings({ showKeyboard: !getSettings().showKeyboard }) },
+  { id: 'tools.shortcuts', label: 'Настроить горячие клавиши…', keys: [], group: 'Инструменты', run: () => A.openDialog('shortcutsEdit') },
+  { id: 'tools.settings', label: 'Настройки…', keys: ['Ctrl+,'], group: 'Инструменты', run: () => A.openDialog('settings') },
+  ...([['note', 'по нотам'], [4, '1/4'], [8, '1/8'], [16, '1/16'], [32, '1/32']] as const).map(
+    ([v, label]): Command => ({ id: `snap.${v}`, label: `Сетка ввода мышью: ${label}`, keys: [], group: 'Ввод нот', run: () => updateSettings({ snap: v }) }),
+  ),
   // Tools / help
   { id: 'tools.stats', label: 'Статистика произведения…', keys: [], group: 'Инструменты', run: () => A.openDialog('stats') },
   { id: 'help.shortcuts', label: 'Горячие клавиши', keys: ['F1'], group: 'Справка', run: () => A.openDialog('shortcuts') },
@@ -182,6 +198,26 @@ const list: Command[] = [
 ];
 
 export const commands = new Map(list.map((c) => [c.id, c]));
+/** Factory shortcuts, for "reset to default". */
+export const defaultKeys = new Map(list.map((c) => [c.id, [...c.keys]]));
+
+/** Applies user shortcut overrides (command id → keys). A key is never bound to two commands. */
+export function applyShortcutOverrides(overrides: Record<string, string[]>): void {
+  for (const c of list) c.keys = [...(defaultKeys.get(c.id) ?? [])];
+  for (const [id, keys] of Object.entries(overrides)) {
+    const c = commands.get(id);
+    if (!c) continue;
+    for (const other of list) if (other.id !== id) other.keys = other.keys.filter((k) => !keys.includes(k));
+    c.keys = [...keys];
+  }
+  keyIndex = null;
+}
+
+/** Command currently bound to a shortcut, if any. */
+export function commandForKey(key: string): Command | undefined {
+  const id = index().get(key);
+  return id ? commands.get(id) : undefined;
+}
 
 export function runCommand(id: string): void {
   const c = commands.get(id);
@@ -228,7 +264,23 @@ function index(): Map<string, string> {
   return keyIndex;
 }
 
+/** While a shortcut is being recorded, key presses go to this handler instead. */
+let capture: ((shortcut: string) => void) | null = null;
+export function captureNextShortcut(cb: ((shortcut: string) => void) | null) {
+  capture = cb;
+}
+
 export function handleKeyDown(e: KeyboardEvent): boolean {
+  if (capture) {
+    const sc = eventToShortcut(e);
+    if (!sc) return true;
+    e.preventDefault();
+    e.stopPropagation();
+    const cb = capture;
+    capture = null;
+    cb(sc);
+    return true;
+  }
   const t = e.target as HTMLElement | null;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return false;
   if (getState().dialog.kind !== 'none') return false;

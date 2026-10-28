@@ -16,6 +16,7 @@ fileAssociations:
     description: NoteForge score project
     role: Editor
 win:
+  icon: build/icon.png
   target:
     - target: nsis
       arch: [x64]

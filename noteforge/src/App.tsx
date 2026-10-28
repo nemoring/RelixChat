@@ -10,9 +10,25 @@ import { handleKeyDown } from './input/commands';
 import { useStore, getState, isDirty, subscribe } from './state/store';
 import * as A from './state/actions';
 import { platform } from './platform';
+import { PianoKeyboard } from './ui/PianoKeyboard';
+import { loadSettings, useSettings } from './state/settings';
+import { applyShortcutOverrides } from './input/commands';
+import { startAutosave, checkRecovery } from './state/autosave';
+import { startMidiInput } from './input/midiInput';
 
 export function App() {
   const showPalette = useStore((s) => s.view.showPalette);
+  const showKeyboard = useSettings((s) => s.showKeyboard);
+
+  // Settings, autosave, crash recovery and MIDI input.
+  useEffect(() => {
+    void loadSettings().then((st) => {
+      applyShortcutOverrides(st.shortcuts);
+      startAutosave();
+      void checkRecovery();
+      void startMidiInput();
+    });
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => handleKeyDown(e);
@@ -69,6 +85,7 @@ export function App() {
         {showPalette && <Palette />}
         <ScoreView />
       </div>
+      {showKeyboard && <PianoKeyboard />}
       <Transport />
       <StatusBar />
       <Dialogs />

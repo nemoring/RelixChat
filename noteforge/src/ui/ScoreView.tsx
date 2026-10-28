@@ -7,6 +7,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { useStore, getState } from '../state/store';
 import { scoreToMei, parseStaffSvgId, measureSvgId, staffSvgId, type ElementRef } from '../engrave/mei';
 import { getEngraver } from '../engrave/engraver';
+import { changedMeasures, pageMetaOf, renderPartialPage, warmUpFastLayout, type PageMeta } from '../engrave/fastLayout';
 import { verovioOptions, pageSizeMm, PX_PER_MM, hasForcedBreaks } from '../engrave/layout';
 import { getStaff, timeline, clefAt, staffCount, ottavaOctaves, eventIndex, comparePos } from '../model/query';
 import { selectedEvents } from '../state/selection';
@@ -14,7 +15,11 @@ import { svgIdOf } from '../engrave/mei';
 import { clefBottomLine } from '../model/pitch';
 import { Frac, ZERO, cmp } from '../model/fraction';
 import * as A from '../state/actions';
-import { attachPlayback, invalidatePlaybackGeometry } from './playbackOverlay';
+import { attachPlayback, invalidatePlaybackGeometry, measureGeometry } from './playbackOverlay';
+import { getSettings } from '../state/settings';
+import { frac as mkFrac } from '../model/fraction';
+import { measureLength } from '../model/duration';
+import { timeSigAt } from '../model/query';
 import type { Score } from '../model/types';
 
 interface RenderInfo {
@@ -30,6 +35,8 @@ interface CachedPage {
   /** viewBox width/height in Verovio units (tenths of mm). */
   w: number;
   h: number;
+  /** Measures and systems on the page (from the full layout). */
+  meta?: PageMeta | null;
 }
 
 function viewBoxOf(svg: string): [number, number] {
@@ -73,20 +80,51 @@ export function ScoreView() {
   const engraver = useMemo(() => getEngraver(), []);
 
   // ── layout: score → MEI → Verovio (in the worker) ──
+  const prevScore = useRef<Score | null>(null);
+  const prevMode = useRef(view.mode);
+  const renderRef = useRef<RenderInfo | null>(null);
+  renderRef.current = render;
   useEffect(() => {
     let cancelled = false;
-    const { mei, index } = scoreToMei(score);
-    engraver.load(mei, verovioOptions(score.layout, view.mode, hasForcedBreaks(score))).then((info) => {
-      if (cancelled || !info) return;
-      if (!info.ok) {
-        setError(info.log || 'Verovio не смог обработать партитуру');
-        return;
+    const prev = prevScore.current;
+    prevScore.current = score;
+    const sameMode = prevMode.current === view.mode;
+    prevMode.current = view.mode;
+    // Fast path: re-engrave only the visible pages whose notes changed.
+    const changed = prev && sameMode && view.mode === 'page' && renderRef.current ? changedMeasures(prev, score) : null;
+    if (changed && changed.size) {
+      for (const [p, c] of cache.current) {
+        if (!c.meta || c.renderId !== renderRef.current!.renderId) continue;
+        const meta = c.meta;
+        if (![...changed].some((m) => m >= meta.first && m <= meta.last)) continue;
+        renderPartialPage(score, p, meta).then((r) => {
+          if (cancelled || !r || !renderRef.current) return;
+          const cur = cache.current.get(p);
+          if (!cur || cur.renderId !== renderRef.current.renderId) return;
+          for (const [k, v] of r.index) renderRef.current.index.set(k, v);
+          const [w, h] = viewBoxOf(r.svg);
+          cache.current.set(p, { ...cur, svg: r.svg, w, h });
+          setCacheVersion((x) => x + 1);
+        });
       }
-      setError(null);
-      setRender({ renderId: info.renderId, pageCount: info.pageCount, index, ms: info.ms });
-    });
+    }
+    // Full layout (debounced while the fast path keeps the screen current).
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      const { mei, index } = scoreToMei(score);
+      engraver.load(mei, verovioOptions(score.layout, view.mode, hasForcedBreaks(score))).then((info) => {
+        if (cancelled || !info) return;
+        if (!info.ok) {
+          setError(info.log || 'Verovio не смог обработать партитуру');
+          return;
+        }
+        setError(null);
+        setRender({ renderId: info.renderId, pageCount: info.pageCount, index, ms: info.ms });
+      });
+    }, changed && changed.size ? 350 : 0);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [score, view.mode, engraver]);
 
@@ -108,7 +146,7 @@ export function ScoreView() {
       engraver.page(render.renderId, p).then((svg) => {
         if (engraver.currentId !== render.renderId) return;
         const [w, h] = viewBoxOf(svg);
-        cache.current.set(p, { renderId: render.renderId, svg, w, h });
+        cache.current.set(p, { renderId: render.renderId, svg, w, h, meta: pageMetaOf(svg) });
         setCacheVersion((v) => v + 1);
       });
     }
@@ -157,6 +195,11 @@ export function ScoreView() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [render, cacheVersion, scale, pwMm, phMm, view.mode]);
+
+  useEffect(() => {
+    const t = setTimeout(warmUpFastLayout, 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   // ── playback cursor ──
   useEffect(() => (scrollRef.current ? attachPlayback(scrollRef.current) : undefined), []);
@@ -321,7 +364,8 @@ export function ScoreView() {
         const sp = (lines[4].top - lines[0].top) / 4;
         const bottomY = (lines[4].top + lines[4].bottom) / 2;
         const steps = Math.round((bottomY - e.clientY) / (sp / 2));
-        const time = timeAtX(pageEl, st.score, measure, e.clientX);
+        const snap = getSettings().snap;
+        const time = snap === 'note' ? timeAtX(pageEl, st.score, measure, e.clientX) : snappedTime(scrollRef.current!, st.score, measure, e.clientX, snap) ?? timeAtX(pageEl, st.score, measure, e.clientX);
         const diatonic = clefBottomLine(clefAt(st.score, staff, measure)) + steps + 7 * ottavaOctaves(st.score, staff, measure, time);
         A.enterNoteAt(staff, measure, time, diatonic, e.shiftKey || e.ctrlKey);
         e.preventDefault();
@@ -347,6 +391,40 @@ export function ScoreView() {
     [render],
   );
 
+  // Rhythmic grid under the mouse while entering notes.
+  const gridRaf = useRef(0);
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    const st = getState();
+    const snap = getSettings().snap;
+    if (!st.input.active || snap === 'note') return;
+    const x = e.clientX;
+    const y = e.clientY;
+    const target = e.target as Element;
+    cancelAnimationFrame(gridRaf.current);
+    gridRaf.current = requestAnimationFrame(() => {
+      const root = scrollRef.current;
+      if (!root) return;
+      root.querySelectorAll('.grid-line').forEach((g) => g.remove());
+      const pageEl = target.closest('.page');
+      if (!pageEl) return;
+      const hit = findStaffAt(pageEl, x, y);
+      if (!hit) return;
+      const g = measureGeometry(root, hit.measure);
+      if (!g) return;
+      const len = measureLength(timeSigAt(st.score, hit.measure));
+      const n = Math.round((len.n / len.d) * snap);
+      const beat = 1 / timeSigAt(st.score, hit.measure).unit;
+      for (let k = 0; k < n; k++) {
+        const t = k / snap;
+        const gx = interpolateX(g.points, t);
+        const line = document.createElement('div');
+        line.className = `grid-line${Math.abs(t / beat - Math.round(t / beat)) < 1e-9 ? ' beat' : ''}`;
+        Object.assign(line.style, { left: `${gx}px`, top: `${g.top}px`, height: `${g.bottom - g.top}px` });
+        g.page.querySelector('.play-overlay')?.appendChild(line);
+      }
+    });
+  }, []);
+
   const onWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey) {
       e.preventDefault();
@@ -355,7 +433,7 @@ export function ScoreView() {
   }, []);
 
   return (
-    <div className={`score-scroll mode-${view.mode}${inputActive ? ' input-mode' : ''}`} ref={scrollRef} onMouseDown={onMouseDown} onWheel={onWheel} tabIndex={-1}>
+    <div className={`score-scroll mode-${view.mode}${inputActive ? ' input-mode' : ''}`} ref={scrollRef} onMouseDown={onMouseDown} onMouseMove={onMouseMove} onWheel={onWheel} tabIndex={-1}>
       {error && <div className="engrave-error">Ошибка гравировки: {error}</div>}
       <div className="pages">
         {pages.map((p) => (
@@ -423,4 +501,32 @@ function measureContentLeft(staffEl: Element, lineLeft: number): number {
     if (r.width > 0) x = Math.max(x, r.right + 6);
   }
   return x;
+}
+
+function interpolateX(pts: { t: number; x: number }[], t: number): number {
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (t >= pts[i].t && t <= pts[i + 1].t) return pts[i].x + ((t - pts[i].t) / Math.max(1e-9, pts[i + 1].t - pts[i].t)) * (pts[i + 1].x - pts[i].x);
+  }
+  return pts[pts.length - 1]?.x ?? 0;
+}
+
+/** Time under x snapped to the grid (1/snap of a whole note), from the engraved positions. */
+function snappedTime(root: HTMLElement, score: Score, measure: number, clientX: number, snap: number): Frac | null {
+  const g = measureGeometry(root, measure);
+  if (!g) return null;
+  const x = clientX - g.page.getBoundingClientRect().left;
+  const pts = g.points;
+  let t = 0;
+  if (x <= pts[0].x) t = 0;
+  else if (x >= pts[pts.length - 1].x) t = pts[pts.length - 1].t;
+  else
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (x >= pts[i].x && x <= pts[i + 1].x) {
+        t = pts[i].t + ((x - pts[i].x) / Math.max(1e-9, pts[i + 1].x - pts[i].x)) * (pts[i + 1].t - pts[i].t);
+        break;
+      }
+    }
+  const len = measureLength(timeSigAt(score, measure));
+  const k = Math.max(0, Math.min(Math.floor(t * snap + 0.35), Math.round((len.n / len.d) * snap) - 1));
+  return mkFrac(k, snap);
 }

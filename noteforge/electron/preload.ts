@@ -16,6 +16,13 @@ contextBridge.exposeInMainWorld('noteforge', {
   printBegin: (w: number, h: number, title: string) => ipcRenderer.invoke('print:begin', w, h, title),
   printPage: (job: string, svg: string) => ipcRenderer.invoke('print:page', job, svg),
   printFinish: (job: string, action: 'pdf' | 'print', name: string) => ipcRenderer.invoke('print:finish', job, action, name),
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  setSettings: (v: unknown) => ipcRenderer.invoke('settings:set', v),
+  autosaveWrite: (key: string, content: string, meta: unknown) => ipcRenderer.invoke('autosave:write', key, content, meta),
+  autosaveClear: (key: string) => ipcRenderer.invoke('autosave:clear', key),
+  autosaveRecoverable: () => ipcRenderer.invoke('autosave:recoverable'),
+  autosaveRead: (key: string) => ipcRenderer.invoke('autosave:read', key),
+  autosaveDiscardRecovered: () => ipcRenderer.invoke('autosave:discardRecovered'),
   setDocumentState: (title: string, dirty: boolean) => ipcRenderer.send('doc:state', title, dirty),
   getLaunchFile: () => ipcRenderer.invoke('app:launchFile'),
   onCloseRequest: (cb: () => void) => {

@@ -194,6 +194,12 @@ export interface MeiOptions {
   pageBreaks?: number[];
   /** Literal page number for a partial render (instead of automatic numbering). */
   pageLabel?: string;
+  /**
+   * Partial re-layout of one page in the middle of the score: no repeated
+   * opening tempo mark and the abbreviated instrument name, as on a
+   * continuation page.
+   */
+  partial?: boolean;
 }
 
 function tempoXml(t: Tempo, id: string): string {
@@ -321,7 +327,7 @@ export function scoreToMei(score: Score, opts: MeiOptions = {}): MeiResult {
     const partStaves = refs.filter((r) => r.partIndex === pi);
     const multi = partStaves.length > 1;
     if (multi) out.push(`<staffGrp symbol="brace" bar.thru="true">`);
-    if (multi) out.push(`<label>${esc(part.name)}</label><labelAbbr>${esc(part.abbreviation)}</labelAbbr>`);
+    if (multi) out.push(opts.partial && from > 0 ? `<label>${esc(part.abbreviation)}</label>` : `<label>${esc(part.name)}</label><labelAbbr>${esc(part.abbreviation)}</labelAbbr>`);
     partStaves.forEach((r) => {
       const n = refs.indexOf(r) + 1;
       const label = !multi ? `<label>${esc(part.name)}</label>` : '';
@@ -385,7 +391,7 @@ export function scoreToMei(score: Score, opts: MeiOptions = {}): MeiResult {
     });
     out.push(...ctl);
     // Tempo marks.
-    if (m === from) out.push(tempoXml(m === 0 ? score.tempo : (score.measures[m].tempo ?? temposBefore(score, m)), `nf-tempo-${m}`));
+    if (m === from && !(opts.partial && from > 0 && !mi.tempo)) out.push(tempoXml(m === 0 ? score.tempo : (score.measures[m].tempo ?? temposBefore(score, m)), `nf-tempo-${m}`));
     else if (mi.tempo) out.push(tempoXml(mi.tempo, `nf-tempo-${m}`));
     // Navigation marks.
     const ts = sigs[m];

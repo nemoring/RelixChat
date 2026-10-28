@@ -8,7 +8,7 @@ import { add, cmp, lt, sub, ZERO, le } from './fraction';
 import { restsFor } from './factory';
 import { newId } from './ids';
 
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '1.0.0';
 
 export function serializeProject(score: Score): string {
   const file: ProjectFile = {

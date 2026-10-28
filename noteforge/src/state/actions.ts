@@ -15,6 +15,7 @@ import { commit, getState, setState, undo, redo, loadDocument, isDirty, type Sel
 import { platform } from '../platform';
 import { previewSelection } from './playback';
 import { selectedEvents, selectionMeasures } from './selection';
+import { addRecentFile, getSettings, updateSettings } from './settings';
 
 export { undo, redo };
 
@@ -119,6 +120,32 @@ export function enterNote(step: Step, addToChord = false): void {
   const ref = referenceDiatonic(st.score, c);
   const octave = nearestOctave(step, ref);
   writeAtCursor(`Нота ${step}`, { type: 'chord', notes: [{ step, octave, alter: keyAlter(key, step) }], attrs: lineAttrs() });
+}
+
+/** MIDI keyboard / on-screen keyboard entry: a pitch by MIDI number, spelled for the key. */
+export function enterMidiPitch(midi: number, addToChord: boolean): void {
+  const s = getState();
+  if (!s.input.active) {
+    if (s.selection.kind === 'none') return;
+    toggleInputMode(true);
+  }
+  const st = getState();
+  const c = st.cursor!;
+  const key = keyAt(st.score, c.measure);
+  let p = pitchFromMidi(midi, key < 0);
+  // Prefer the spelling of the key signature (F# in G major, Bb in F major).
+  if (p.alter !== 0 && keyAlter(key, p.step) !== p.alter) {
+    const alt = pitchFromMidi(midi, key >= 0);
+    if (keyAlter(key, alt.step) === alt.alter) p = alt;
+  }
+  if (addToChord) {
+    const sel = selectedEvent();
+    if (sel && sel.ev.type === 'chord') {
+      addPitch(p);
+      return;
+    }
+  }
+  writeAtCursor(`Нота ${p.step}`, { type: 'chord', notes: [p], attrs: lineAttrs() });
 }
 
 /** Mouse entry: note at a staff position (diatonic) and time. */
@@ -623,6 +650,7 @@ export function loadProjectText(text: string, path: string | null): boolean {
     return false;
   }
   loadDocument(res.score, path);
+  if (path && platform.isElectron) addRecentFile(path);
   if (res.repaired.length) {
     setState({
       dialog: { kind: 'message', message: { title: 'Файл открыт с исправлениями', text: res.repaired.slice(0, 20).join('\n') + (res.repaired.length > 20 ? `\n… и ещё ${res.repaired.length - 20}` : '') } },
@@ -649,10 +677,21 @@ export async function saveProject(saveAs = false): Promise<boolean> {
     const path = await platform.saveProject(saveAs ? null : s.filePath, serializeProject(score), `${fileName(s.filePath)}.nfg`);
     if (!path) return false;
     setState({ savedScore: score, filePath: platform.isElectron ? path : s.filePath, status: `Сохранено: ${path}` });
+    if (platform.isElectron) addRecentFile(path);
     return true;
   } catch (e) {
     setState({ dialog: { kind: 'message', message: { title: 'Ошибка сохранения', text: (e as Error).message } } });
     return false;
+  }
+}
+
+export async function openRecent(path: string): Promise<void> {
+  if (!(await confirmDiscard())) return;
+  try {
+    loadProjectText(await platform.readFile(path), path);
+  } catch (e) {
+    updateSettings({ recentFiles: getSettings().recentFiles.filter((p) => p !== path) });
+    setState({ dialog: { kind: 'message', message: { title: 'Не удалось открыть файл', text: `${path}\n${(e as Error).message}` } } });
   }
 }
 

@@ -6,6 +6,7 @@ import { keyName } from '../model/pitch';
 import type { ClefKind, TimeSig } from '../model/types';
 import { DYNAMICS } from '../model/types';
 import { useStore } from '../state/store';
+import { Navigator } from './Navigator';
 
 const CLEFS: { clef: ClefKind; glyph: string; name: string }[] = [
   { clef: 'treble', glyph: '𝄞', name: 'Скрипичный' },
@@ -123,9 +124,22 @@ function MelodyPanel() {
 }
 
 export function Palette() {
-  const hasTarget = useStore((s) => s.selection.kind !== 'none' || s.cursor !== null);
+  const [tab, setTab] = useState<'palette' | 'nav'>('palette');
   return (
     <aside className="palette">
+      <div className="side-tabs">
+        <button className={tab === 'palette' ? 'on' : ''} onClick={() => setTab('palette')}>Палитра</button>
+        <button className={tab === 'nav' ? 'on' : ''} onClick={() => setTab('nav')}>Навигатор</button>
+      </div>
+      {tab === 'palette' ? <PaletteContent /> : <Navigator />}
+    </aside>
+  );
+}
+
+function PaletteContent() {
+  const hasTarget = useStore((s) => s.selection.kind !== 'none' || s.cursor !== null);
+  return (
+    <>
       <MelodyPanel />
       <div className="palette-hint">{hasTarget ? 'Применяется к выделению' : 'Выделите ноту, фрагмент (Shift+щелчок) или такт'}</div>
       <Section title="Ключи">
@@ -245,6 +259,6 @@ export function Palette() {
         <Cmd id="staff.up" glyph="⤒" label="На верхний стан" />
         <Cmd id="staff.down" glyph="⤓" label="На нижний стан" />
       </Section>
-    </aside>
+    </>
   );
 }

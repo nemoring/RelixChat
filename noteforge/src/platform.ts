@@ -8,6 +8,11 @@ export interface OpenResult {
   content: string;
 }
 
+export interface AutosaveMeta {
+  title: string;
+  filePath: string | null;
+}
+
 export interface PlatformApi {
   isElectron: boolean;
   openProject(): Promise<OpenResult | null>;
@@ -30,6 +35,13 @@ export interface PlatformApi {
   printBegin(widthMm: number, heightMm: number, title: string): Promise<string>;
   printPage(job: string, svg: string): Promise<void>;
   printFinish(job: string, action: 'pdf' | 'print', suggestedName: string): Promise<string | null>;
+  getSettings(): Promise<Record<string, unknown>>;
+  setSettings(v: Record<string, unknown>): Promise<void>;
+  autosaveWrite(key: string, content: string, meta: AutosaveMeta): Promise<void>;
+  autosaveClear(key: string): Promise<void>;
+  autosaveRecoverable(): Promise<(AutosaveMeta & { key: string; savedAt: string })[]>;
+  autosaveRead(key: string): Promise<string>;
+  autosaveDiscardRecovered(): Promise<void>;
   getLaunchFile(): Promise<string | null>;
   onCloseRequest(cb: () => void): void;
   confirmClose(): void;
@@ -150,6 +162,29 @@ const browserFallback: PlatformApi = {
     w.print();
     return 'print';
   },
+  // Browser fallback: settings and autosaves live in localStorage.
+  getSettings: async () => {
+    try {
+      return JSON.parse(localStorage.getItem('noteforge.settings') ?? '{}');
+    } catch {
+      return {};
+    }
+  },
+  setSettings: async (v) => localStorage.setItem('noteforge.settings', JSON.stringify(v)),
+  autosaveWrite: async (key, content, meta) => {
+    try {
+      localStorage.setItem(`noteforge.autosave.${key}`, JSON.stringify({ content, meta: { ...meta, savedAt: new Date().toISOString() } }));
+    } catch {
+      /* quota exceeded: skip */
+    }
+  },
+  autosaveClear: async (key) => localStorage.removeItem(`noteforge.autosave.${key}`),
+  autosaveRecoverable: async () =>
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('noteforge.autosave.'))
+      .map((k) => ({ key: k.slice('noteforge.autosave.'.length), ...JSON.parse(localStorage.getItem(k)!).meta })),
+  autosaveRead: async (key) => JSON.parse(localStorage.getItem(`noteforge.autosave.${key}`) ?? '{}').content,
+  autosaveDiscardRecovered: async () => {},
   getLaunchFile: async () => null,
   onCloseRequest: () => {},
   confirmClose: () => {},

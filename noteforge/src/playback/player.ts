@@ -65,7 +65,7 @@ class Player {
     previewNotes: true,
   };
   private listeners = new Set<Listener>();
-  private frameListeners = new Set<(sec: number, playing: Set<string>) => void>();
+  private frameListeners = new Set<(sec: number, playing: Set<string>, keys: Set<number>) => void>();
   ctx: AudioContext | null = null;
   synth: Synth | null = null;
   soundFont: SoundFont | null = null;
@@ -103,7 +103,7 @@ class Player {
     this.state = { ...this.state, ...p };
     this.listeners.forEach((l) => l());
   }
-  onFrame(cb: (sec: number, playing: Set<string>) => void): () => void {
+  onFrame(cb: (sec: number, playing: Set<string>, keys: Set<number>) => void): () => void {
     this.frameListeners.add(cb);
     return () => this.frameListeners.delete(cb);
   }
@@ -290,18 +290,22 @@ class Player {
     let sec = this.perfTime(this.ctx.currentTime);
     if (this.state.loop && sec >= this.loopEnd) sec = this.loopStart + ((sec - this.loopStart) % Math.max(0.001, this.loopEnd - this.loopStart));
     const playing = new Set<string>();
+    const keys = new Set<number>();
     // Notes sounding now: scan a window around the current note index.
     const i0 = lowerBound(perf.notes, sec - 30);
     for (let i = i0; i < perf.notes.length && perf.notes[i].start <= sec; i++) {
       const n = perf.notes[i];
-      if (n.end > sec) for (const id of n.noteIds) playing.add(id);
+      if (n.end > sec) {
+        for (const id of n.noteIds) playing.add(id);
+        keys.add(n.key);
+      }
     }
     const pos = positionAt(perf, sec);
     if (pos.measure !== this.state.measure || Math.abs(sec - this.lastNotified) >= 0.25) {
       this.lastNotified = sec;
       this.set({ position: sec, measure: pos.measure });
     }
-    this.frameListeners.forEach((cb) => cb(sec, playing));
+    this.frameListeners.forEach((cb) => cb(sec, playing, keys));
   }
 
   private halt() {
@@ -318,7 +322,7 @@ class Player {
   private finish() {
     this.halt();
     this.set({ status: 'stopped', position: 0 });
-    this.frameListeners.forEach((cb) => cb(-1, new Set()));
+    this.frameListeners.forEach((cb) => cb(-1, new Set(), new Set()));
   }
 
   pause() {
@@ -326,13 +330,13 @@ class Player {
     const pos = this.perfTime(this.ctx.currentTime);
     this.halt();
     this.set({ status: 'paused', position: Math.max(0, pos) });
-    this.frameListeners.forEach((cb) => cb(pos, new Set()));
+    this.frameListeners.forEach((cb) => cb(pos, new Set(), new Set()));
   }
 
   stop() {
     this.halt();
     this.set({ status: 'stopped', position: 0 });
-    this.frameListeners.forEach((cb) => cb(-1, new Set()));
+    this.frameListeners.forEach((cb) => cb(-1, new Set(), new Set()));
   }
 
   setSpeed(speed: number) {
