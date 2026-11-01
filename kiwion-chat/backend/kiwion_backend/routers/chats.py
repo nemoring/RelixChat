@@ -138,7 +138,8 @@ def _preflight(st: AppState, db: DBSession, user: User, content_len: int = 0):
     return cfg
 
 
-async def _open_stream(st: AppState, history: list[dict], cfg: dict, temperature: float | None):
+async def _open_stream(st: AppState, history: list[dict], cfg: dict, temperature: float | None, chat_id: str):
+    st.active_streams.pop(("stop", chat_id), None)   # forget stale stop requests from a previous answer
     agen = st.inference.generate(history, max_tokens=cfg["max_tokens_per_reply"],
                                  temperature=0.7 if temperature is None else temperature)
     try:
@@ -161,8 +162,7 @@ def _sse(obj: dict) -> str:
 def _stream(st: AppState, user_id: int, chat_id: str, assistant_id: str, first: dict, agen, meta: dict):
     async def gen():
         key = ("user", user_id)
-        stop_key = ("stop", chat_id)
-        st.active_streams.pop(stop_key, None)
+        stop_key = ("stop", chat_id)   # cleared in _open_stream; a stop pressed early must not be lost
         st.active_streams[key] = st.active_streams.get(key, 0) + 1
         buf: list[str] = []
         status, prompt_t, completion_t = "streaming", 0, 0
@@ -252,7 +252,7 @@ async def send_message(chat_id: str, body: MessageIn, request: Request,
     cfg = _preflight(st, db, user, len(body.content))
     content = body.content.strip()
     history = _history(chat) + [{"role": "user", "content": content}]
-    opened, err = await _open_stream(st, history, cfg, body.temperature)
+    opened, err = await _open_stream(st, history, cfg, body.temperature, chat.id)
     if err:
         return err  # nothing was written: the client keeps the user's text
     seq = _next_seq(db, chat.id)
@@ -278,7 +278,7 @@ async def regenerate(chat_id: str, request: Request, user: User = Depends(verifi
     if last_user is None:
         raise api_error(400, "nothing_to_regenerate", "Нет сообщения для повторной генерации")
     history = _history(chat, upto_seq=last_user.seq)
-    opened, err = await _open_stream(st, history, cfg, None)
+    opened, err = await _open_stream(st, history, cfg, None, chat.id)
     if err:
         return err
     for m in msgs:
@@ -304,7 +304,7 @@ async def edit_message(chat_id: str, message_id: str, body: MessageIn, request: 
     cfg = _preflight(st, db, user, len(body.content))
     content = body.content.strip()
     history = _history(chat, upto_seq=target.seq - 1) + [{"role": "user", "content": content}]
-    opened, err = await _open_stream(st, history, cfg, body.temperature)
+    opened, err = await _open_stream(st, history, cfg, body.temperature, chat.id)
     if err:
         return err
     for m in list(chat.messages):

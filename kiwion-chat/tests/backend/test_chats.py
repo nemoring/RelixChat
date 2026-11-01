@@ -116,3 +116,20 @@ def test_method_override_for_android(client):
     r = client.post(f"/api/chats/{chat['id']}", json={"title": "via override"},
                     headers={**h, "X-HTTP-Method-Override": "PATCH"})
     assert r.status_code == 200 and r.json()["title"] == "via override"
+
+
+def test_stop_requested_before_stream_starts_is_honoured(client):
+    h = register(client, "earlystop@kiwion.dev")
+    chat = client.post("/api/chats", json={}, headers=h).json()
+    st = client.kiwion
+    orig = st.inference.generate
+
+    def generate_then_stop(*a, **kw):
+        # the user presses "stop" while the backend is still connecting to the model
+        st.active_streams[("stop", chat["id"])] = True   # what POST /api/chats/{id}/stop does
+        return orig(*a, **kw)
+
+    st.inference.generate = generate_then_stop
+    r = client.post(f"/api/chats/{chat['id']}/messages", json={"content": "stop me early"}, headers=h)
+    st.inference.generate = orig
+    assert sse_events(r.text)[-1]["message"]["status"] == "stopped"
