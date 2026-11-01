@@ -107,9 +107,6 @@ public class AuthActivity extends BaseActivity {
         });
         form.addView(link("Создать аккаунт", new View.OnClickListener() { public void onClick(View v) { switchMode("register"); } }));
         form.addView(link("Забыли пароль?", new View.OnClickListener() { public void onClick(View v) { switchMode("forgot"); } }));
-        form.addView(link("Адрес сервера", new View.OnClickListener() {
-            public void onClick(View v) { SettingsActivity.editServer(AuthActivity.this, null); }
-        }));
     }
 
     private void renderRegister() {

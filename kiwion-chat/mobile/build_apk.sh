@@ -36,31 +36,41 @@ cp "$SRC/AndroidManifest.xml" "$OUT/AndroidManifest.xml"
 # what Gradle would merge in: package name, version and SDK levels
 sed -i 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.kiwifuzzy.kiwion" android:versionCode="1" android:versionName="'"$APP_VERSION"'">\n    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />#' "$OUT/AndroidManifest.xml"
 
-# build-time configuration
-SERVER="${KIWION_SERVER_URL:-https://kiwion.example.com}"
-sed -i "s#DEFAULT_SERVER = \".*\";#DEFAULT_SERVER = \"${SERVER}\";#" "$OUT/src/dev/kiwifuzzy/kiwion/BuildConfigKiwion.java"
+# build-time configuration: the ONLY server the app will talk to (users cannot change it)
+SERVER="${KIWION_SERVER_URL:-}"
+SERVER="${SERVER%/}"
+if [ -z "$SERVER" ]; then
+  echo "set KIWION_SERVER_URL=https://your-domain — the app will be locked to this server"; exit 1
+fi
+case "$SERVER" in https://*) ;; *) [ "${KIWION_ALLOW_CLEARTEXT:-0}" = "1" ] || { echo "KIWION_SERVER_URL must start with https://"; exit 1; } ;; esac
+cp -r "$SRC/res" "$OUT/res"
+sed -i "s#<string name=\"kiwion_server_url\" translatable=\"false\">.*</string>#<string name=\"kiwion_server_url\" translatable=\"false\">${SERVER}</string>#" "$OUT/res/values/config.xml"
+grep -q "$SERVER" "$OUT/res/values/config.xml" || { echo "failed to set server url"; exit 1; }
+echo "server: $SERVER"
 if [ "${KIWION_ALLOW_CLEARTEXT:-0}" = "1" ]; then
   sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' "$OUT/AndroidManifest.xml"
   echo "WARNING: cleartext http allowed (testing build)"
 fi
 
 echo "[1/5] resources"
-"$AAPT" package -f -m -J "$OUT/gen" -M "$OUT/AndroidManifest.xml" -S "$SRC/res" -I "$ANDROID_JAR"
+"$AAPT" package -f -m -J "$OUT/gen" -M "$OUT/AndroidManifest.xml" -S "$OUT/res" -I "$ANDROID_JAR"
 
 echo "[2/5] javac"
 find "$OUT/src" "$OUT/gen" -name '*.java' > "$OUT/sources.txt"
-javac -nowarn -encoding UTF-8 --release 8 -classpath "$ANDROID_JAR" -d "$OUT/classes" @"$OUT/sources.txt" 2>&1 | grep -v "^warning: \[options\]\|^Note:\|^1 warning" || true
+# like Gradle: Java 8 language level with android.jar as the boot classpath (not the JDK's own classes)
+javac -nowarn -encoding UTF-8 -source 8 -target 8 -bootclasspath "$ANDROID_JAR" -d "$OUT/classes" @"$OUT/sources.txt" 2>&1 | grep -v "^warning: \[options\]\|^Note:\|^1 warning" || true
 [ -f "$OUT/classes/dev/kiwifuzzy/kiwion/KiwionApp.class" ] || { echo "javac failed"; exit 1; }
 
 echo "[3/5] dex"
 if [ -n "$D8" ]; then
-  "$D8" --min-api 24 --lib "$ANDROID_JAR" --output "$OUT" $(find "$OUT/classes" -name '*.class')
+  (cd "$OUT/classes" && jar cf "$OUT/classes.jar" .)
+  "$D8" --release --min-api 24 --lib "$ANDROID_JAR" --output "$OUT" "$OUT/classes.jar"
 else
   "$DX" --dex --min-sdk-version=24 --output="$OUT/classes.dex" "$OUT/classes"
 fi
 
 echo "[4/5] package"
-"$AAPT" package -f -M "$OUT/AndroidManifest.xml" -S "$SRC/res" -I "$ANDROID_JAR" -F "$OUT/kiwion-unsigned.apk"
+"$AAPT" package -f -M "$OUT/AndroidManifest.xml" -S "$OUT/res" -I "$ANDROID_JAR" -F "$OUT/kiwion-unsigned.apk"
 (cd "$OUT" && "$AAPT" add kiwion-unsigned.apk classes.dex >/dev/null)
 "$ZIPALIGN" -f -p 4 "$OUT/kiwion-unsigned.apk" "$OUT/kiwion-aligned.apk"
 

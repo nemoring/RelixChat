@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default for local builds. Release builds take the address from KIWION_SERVER_URL
+     (build_apk.sh rewrites this file; Gradle overrides it per build). Users cannot change it. -->
+<resources>
+    <string name="kiwion_server_url" translatable="false">https://kiwion.example.com</string>
+</resources>

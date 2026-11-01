@@ -1,6 +1,5 @@
 package dev.kiwifuzzy.kiwion;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -108,9 +107,6 @@ public class SettingsActivity extends BaseActivity {
         row(card, "О приложении", "Версия, модель, лицензии", go("about"));
         Ui.add(body, card, 6);
         LinearLayout card2 = Ui.card(this, pal);
-        row(card2, "Сервер", app.prefs.server(), new View.OnClickListener() {
-            public void onClick(View v) { editServer(SettingsActivity.this, new Runnable() { public void run() { render(); } }); }
-        });
         row(card2, "Выйти", null, new View.OnClickListener() {
             public void onClick(View v) {
                 bg(new Task<JSONObject>() { public JSONObject run() throws ApiException { return app.api.post("/api/auth/logout", null); } },
@@ -422,27 +418,5 @@ public class SettingsActivity extends BaseActivity {
     private void copy(String s) {
         ((ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Kiwion", s));
         toast("Скопировано");
-    }
-
-    /** Lets self-hosters point the app at their own Kiwion backend. */
-    public static void editServer(final Activity a, final Runnable after) {
-        final Prefs prefs = KiwionApp.get().prefs;
-        final EditText e = new EditText(a);
-        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        e.setText(prefs.server());
-        LinearLayout f = new LinearLayout(a);
-        int p = Ui.dp(a, 20);
-        f.setPadding(p, Ui.dp(a, 8), p, 0);
-        f.addView(e, new LinearLayout.LayoutParams(-1, -2));
-        new AlertDialog.Builder(a).setTitle("Адрес сервера Kiwion").setMessage("Например: https://chat.example.com").setView(f)
-                .setPositiveButton("Сохранить", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) {
-                        String url = e.getText().toString().trim();
-                        if (!url.startsWith("http://") && !url.startsWith("https://")) url = "https://" + url;
-                        prefs.server(url);
-                        prefs.token(null);
-                        if (after != null) after.run();
-                    }
-                }).setNegativeButton("Отмена", null).show();
     }
 }

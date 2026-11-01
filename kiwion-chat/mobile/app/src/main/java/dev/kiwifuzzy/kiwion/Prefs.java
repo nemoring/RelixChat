@@ -7,18 +7,25 @@ import java.security.SecureRandom;
 
 /** Small wrapper around SharedPreferences (token, device id, server URL, theme, drafts). */
 public final class Prefs {
-    public static final String DEFAULT_SERVER = BuildConfigKiwion.DEFAULT_SERVER;
+    /** Only automated tests may point the app elsewhere; users cannot change the server. */
+    static volatile String serverOverrideForTests;
     private final SharedPreferences p;
+    private final String server;
 
     public Prefs(Context c) {
         p = c.getSharedPreferences("kiwion", Context.MODE_PRIVATE);
+        // The official Kiwion server is fixed at build time (resource kiwion_server_url).
+        server = c.getString(R.string.kiwion_server_url).replaceAll("/+$", "");
+        if (p.contains("server")) p.edit().remove("server").apply();   // drop addresses saved by 1.0.0
     }
 
     public String token() { return p.getString("token", null); }
     public void token(String t) { p.edit().putString("token", t).apply(); }
 
-    public String server() { return p.getString("server", DEFAULT_SERVER); }
-    public void server(String s) { p.edit().putString("server", s.replaceAll("/+$", "")).apply(); }
+    public String server() {
+        String o = serverOverrideForTests;
+        return o != null ? o : server;
+    }
 
     /** "system" | "light" | "dark" */
     public String theme() { return p.getString("theme", "system"); }

@@ -97,14 +97,7 @@ public class SplashActivity extends BaseActivity {
         row.setTag("retry");
         Button retry = Ui.button(this, pal, "Повторить", true);
         retry.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { status.setTextColor(pal.muted); start(); } });
-        Button server = Ui.button(this, pal, "Сервер", false);
-        server.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { SettingsActivity.editServer(SplashActivity.this, new Runnable() { public void run() { start(); } }); }
-        });
         row.addView(retry);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.leftMargin = Ui.dp(this, 10);
-        row.addView(server, lp);
         Ui.add(box, row, 16);
     }
 

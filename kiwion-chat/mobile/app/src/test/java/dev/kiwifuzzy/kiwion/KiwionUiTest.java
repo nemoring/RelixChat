@@ -131,6 +131,25 @@ public class KiwionUiTest {
         ctl.pause().stop().destroy();
     }
 
+    @org.junit.After
+    public void resetServer() { Prefs.serverOverrideForTests = null; }
+
+    @Test
+    public void serverAddress_isFixed_andCannotBeChangedInTheApp() throws Exception {
+        assertEquals("https://kiwion.example.com", KiwionApp.get().prefs.server());
+        // no "server address" controls anywhere in the UI
+        android.app.Activity[] screens = {
+            Robolectric.buildActivity(AuthActivity.class).setup().get(),
+            Robolectric.buildActivity(SettingsActivity.class).setup().get(),
+        };
+        for (android.app.Activity a : screens) {
+            assertNull(containing(a, "Адрес сервера"));
+            assertNull(byText(a, "Сервер"));
+        }
+        for (java.lang.reflect.Method m : Prefs.class.getMethods())
+            assertFalse("no public setter for the server", m.getName().equals("server") && m.getParameterCount() > 0);
+    }
+
     @Test
     public void tapCounter_resetsAfterPause() {
         final long[] now = {0};
@@ -143,7 +162,7 @@ public class KiwionUiTest {
 
     @Test
     public void splash_showsKiwiAndName_andErrorScreenWhenServerDown() throws Exception {
-        KiwionApp.get().prefs.server("http://127.0.0.1:9");   // nothing listens here
+        Prefs.serverOverrideForTests = "http://127.0.0.1:9";   // nothing listens here
         KiwionApp.get().prefs.token(null);
         final SplashActivity a = Robolectric.buildActivity(SplashActivity.class).setup().get();
         assertNotNull(byText(a, "Kiwion Chat"));
@@ -165,7 +184,7 @@ public class KiwionUiTest {
     public void live_registerVerifyChatStreamStop() throws Exception {
         String srv = server();
         final KiwionApp app = KiwionApp.get();
-        app.prefs.server(srv);
+        Prefs.serverOverrideForTests = srv;
         app.prefs.token(null);
         final String email = "android" + System.nanoTime() + "@kiwion.dev";
 
@@ -220,7 +239,7 @@ public class KiwionUiTest {
     public void live_overloadKeepsText() throws Exception {
         String srv = server();
         final KiwionApp app = KiwionApp.get();
-        app.prefs.server(srv);
+        Prefs.serverOverrideForTests = srv;
         String token = TestMail.registerVerified(srv, "ovl" + System.nanoTime() + "@kiwion.dev");
         app.prefs.token(token);
         JSONObject chat = app.api.post("/api/chats", new JSONObject());

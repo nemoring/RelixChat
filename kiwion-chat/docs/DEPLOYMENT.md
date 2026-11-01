@@ -37,6 +37,15 @@ Docker-вариант: `docker compose -f deploy/docker-compose.inference.yml up
 
 ## 3. VPS
 
+Быстрый путь — одна команда на свежем Ubuntu/Debian VPS (DNS-запись домена уже указывает на сервер):
+
+```bash
+sudo bash deploy/install_vps.sh chat.example.com you@example.com https://github.com/<owner>/<repo>.git <branch>
+# первый запуск создаёт .env с секретами -> впишите SMTP -> запустите команду ещё раз
+```
+
+Вручную:
+
 ```bash
 cp .env.example .env
 # KIWION_ENV=production, KIWION_SECRET_KEY=$(kiwion secret), KIWION_INFERENCE_SECRET=<как на узле>,
@@ -64,8 +73,8 @@ SQLite: `sqlite3 data/kiwion.db ".backup data/backup-$(date +%F).db"` по cron.
 
 ## 4. Android
 
-`KIWION_SERVER_URL=https://chat.example.com mobile/build_apk.sh` — адрес сервера вшивается по
-умолчанию (пользователь может сменить его на экране входа). Для релиза укажите свой keystore
+`KIWION_SERVER_URL=https://chat.example.com mobile/build_apk.sh` — приложение работает только с этим
+сервером, сменить адрес в приложении нельзя. Для релиза укажите свой keystore
 (`KIWION_KEYSTORE`, `KIWION_KEYSTORE_PASS`, `KIWION_KEY_ALIAS`) и храните его в надёжном месте.
 
 ## 5. Страница ожидания релиза

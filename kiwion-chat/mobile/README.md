@@ -12,10 +12,15 @@ KIWION_SERVER_URL=https://chat.example.com ./build_apk.sh
 # -> build/KiwionChat-1.0.0.apk
 ```
 
+**Сервер зашивается при сборке и не меняется в приложении.** `KIWION_SERVER_URL` обязателен
+(только `https://`); в интерфейсе нет поля «Адрес сервера», адрес хранится в ресурсе
+`kiwion_server_url`, а не в настройках пользователя. С полным Android SDK скрипт берёт новейшие
+build-tools (нужны ≥ 35: d8 из 34.0.0 падает на классах, собранных JDK 21).
+
 С установленным Android SDK скрипт сам возьмёт `$ANDROID_HOME/build-tools` (d8) и `platforms`.
 Релизная подпись: `KIWION_KEYSTORE=/path/release.jks KIWION_KEYSTORE_PASS=… KIWION_KEY_ALIAS=kiwion ./build_apk.sh`
 (без этих переменных создаётся debug-ключ в `keystore/`, он не коммитится).
-Для теста с локальным http-сервером: `KIWION_ALLOW_CLEARTEXT=1 KIWION_SERVER_URL=http://192.168.1.10:8080 ./build_apk.sh`.
+Для теста с локальным http-сервером: `KIWION_ALLOW_CLEARTEXT=1 KIWION_SERVER_URL=http://192.168.1.10:8080 ./build_apk.sh` (не для публикации).
 
 ## Android Studio / Gradle
 
@@ -24,8 +29,8 @@ KIWION_SERVER_URL=https://chat.example.com ./build_apk.sh
 
 ```bash
 echo "sdk.dir=$ANDROID_HOME" > local.properties
-gradle assembleDebug                      # app/build/outputs/apk/debug/app-debug.apk
-KIWION_KEYSTORE=/path/release.jks KIWION_KEYSTORE_PASS=… KIWION_KEY_ALIAS=kiwion gradle assembleRelease
+KIWION_SERVER_URL=https://chat.example.com gradle assembleDebug   # app/build/outputs/apk/debug/app-debug.apk
+KIWION_SERVER_URL=https://chat.example.com KIWION_KEYSTORE=/path/release.jks KIWION_KEYSTORE_PASS=… gradle assembleRelease
 gradle lintDebug                          # Android Lint
 ```
 
@@ -40,10 +45,10 @@ gradle lintDebug                          # Android Lint
 
 `SplashActivity` (маскот + Kiwion Chat, проверка сервера/сессии, экран ошибки) → `AuthActivity`
 (вход, регистрация с proof-of-work и кодом приглашения, восстановление пароля, подтверждение email
-кодом из письма, адрес сервера) → `ChatsActivity` (диалоги, статус модели, новый чат, долгое нажатие —
+кодом из письма) → `ChatsActivity` (диалоги, статус модели, новый чат, долгое нажатие —
 переименовать/удалить) → `ChatActivity` (стриминг, стоп, повтор, копирование, редактирование
 долгим нажатием, Markdown с подсветкой кода, черновики, очередь, подсказка при медленной модели) и
 `SettingsActivity` (профиль и лимиты, тема, пароль и устройства, удаление аккаунта, API-ключи со
-статистикой, рефералы, «О приложении» с пасхалкой, адрес сервера, выход).
+статистикой, рефералы, «О приложении» с пасхалкой, выход).
 
 Ссылка `kiwion://register?ref=KIWI…` открывает регистрацию с кодом приглашения.

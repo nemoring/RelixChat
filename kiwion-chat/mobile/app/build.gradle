@@ -2,6 +2,14 @@ plugins {
     id "com.android.application"
 }
 
+// The app talks ONLY to this server; it is fixed at build time and cannot be changed in the app.
+def kiwionServer = (System.getenv("KIWION_SERVER_URL") ?: "").replaceAll('/+$', '')
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.name.toLowerCase().contains("release") } && !kiwionServer.startsWith("https://")) {
+        throw new GradleException("Release build: set KIWION_SERVER_URL=https://your-domain (the only server the app will use)")
+    }
+}
+
 android {
     namespace "dev.kiwifuzzy.kiwion"
     compileSdk 34
@@ -12,6 +20,7 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
+        if (kiwionServer) resValue "string", "kiwion_server_url", kiwionServer
     }
 
     signingConfigs {
