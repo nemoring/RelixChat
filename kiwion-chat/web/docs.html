@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kiwion Developer API</title>
+  <link rel="icon" type="image/png" href="/assets/icons/favicon.png">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" id="hljs-theme" href="/vendor/hljs-light.css">
+  <script src="/vendor/highlight.min.js" defer></script>
+  <script src="/js/docs.js" defer></script>
+  <style>
+    .doc { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+    .doc header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .doc header img { border-radius: 16px; }
+    .doc h2 { margin-top: 34px; } .doc table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
+    .doc td, .doc th { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+    .doc pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; overflow-x: auto; }
+    .doc code { font-family: var(--mono); font-size: 13px; }
+    .doc p code, .doc td code, .doc li code { background: var(--surface-2); padding: 1px 5px; border-radius: 6px; }
+    .ex-tabs { display: flex; gap: 6px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+<div class="doc">
+  <header><img src="/assets/kiwi/logo.png" width="56" height="56" alt=""><div><h1 style="margin:0">Kiwion Developer API</h1>
+    <p class="hint" style="margin:0">OpenAI-совместимый API модели OLMo 2 1B Instruct · <a href="/">Kiwion Chat</a> · <a href="/api/docs">OpenAPI</a></p></div></header>
+
+  <h2>Быстрый старт</h2>
+  <ol>
+    <li>Войдите в Kiwion Chat и подтвердите email.</li>
+    <li>Откройте <b>Настройки → API-ключи</b> и создайте ключ. Полное значение (<code>kw-…</code>) показывается <b>только один раз</b> — сервер хранит лишь его хеш.</li>
+    <li>Передавайте ключ в заголовке <code>Authorization: Bearer kw-…</code>.</li>
+  </ol>
+  <p>Базовый URL: <code id="base">https://your-domain</code><code>/v1</code>. Модель: <code>olmo-2-1b-instruct</code>.</p>
+
+  <h2>Эндпоинты</h2>
+  <table>
+    <tr><th>Метод</th><th>Путь</th><th>Описание</th></tr>
+    <tr><td>GET</td><td><code>/v1/models</code></td><td>Список моделей</td></tr>
+    <tr><td>POST</td><td><code>/v1/chat/completions</code></td><td>Генерация ответа (в том числе потоковая, <code>"stream": true</code>)</td></tr>
+  </table>
+
+  <h3>Параметры <code>/v1/chat/completions</code></h3>
+  <table>
+    <tr><th>Поле</th><th>Тип</th><th>Описание</th></tr>
+    <tr><td><code>model</code></td><td>string</td><td><code>olmo-2-1b-instruct</code> (также принимаются <code>kiwion</code>, <code>kiwion-chat</code>)</td></tr>
+    <tr><td><code>messages</code></td><td>array</td><td>Роли <code>system</code>, <code>developer</code>, <code>user</code>, <code>assistant</code>; до 200 сообщений</td></tr>
+    <tr><td><code>max_tokens</code> / <code>max_completion_tokens</code></td><td>int</td><td>До 1024 токенов ответа (по умолчанию 512)</td></tr>
+    <tr><td><code>temperature</code></td><td>float</td><td>0–2, по умолчанию 0.7</td></tr>
+    <tr><td><code>top_p</code></td><td>float</td><td>0–1, по умолчанию 0.9</td></tr>
+    <tr><td><code>stop</code></td><td>string | string[]</td><td>До 4 стоп-последовательностей</td></tr>
+    <tr><td><code>seed</code></td><td>int</td><td>Для воспроизводимости</td></tr>
+    <tr><td><code>stream</code></td><td>bool</td><td>Потоковый ответ (Server-Sent Events, завершается <code>data: [DONE]</code>)</td></tr>
+    <tr><td><code>stream_options.include_usage</code></td><td>bool</td><td>Последний чанк будет содержать <code>usage</code></td></tr>
+  </table>
+
+  <h2>Примеры</h2>
+  <h3>cURL</h3>
+<pre><code class="language-bash">curl https://your-domain/v1/chat/completions \
+  -H "Authorization: Bearer $KIWION_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "olmo-2-1b-instruct",
+    "messages": [{"role": "user", "content": "Расскажи про птицу киви"}],
+    "max_tokens": 200
+  }'
+
+# потоковый ответ
+curl -N https://your-domain/v1/chat/completions \
+  -H "Authorization: Bearer $KIWION_API_KEY" -H "Content-Type: application/json" \
+  -d '{"model":"olmo-2-1b-instruct","stream":true,"messages":[{"role":"user","content":"Привет!"}]}'</code></pre>
+
+  <h3>Python (официальный SDK openai)</h3>
+<pre><code class="language-python">from openai import OpenAI
+
+client = OpenAI(base_url="https://your-domain/v1", api_key="kw-...")
+
+# обычный ответ
+r = client.chat.completions.create(
+    model="olmo-2-1b-instruct",
+    messages=[{"role": "user", "content": "Напиши хайку про киви"}],
+)
+print(r.choices[0].message.content, r.usage)
+
+# потоковый ответ
+stream = client.chat.completions.create(
+    model="olmo-2-1b-instruct",
+    messages=[{"role": "user", "content": "Объясни рекурсию"}],
+    stream=True,
+)
+for chunk in stream:
+    if chunk.choices and chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)</code></pre>
+
+  <h3>Python (без SDK, httpx)</h3>
+<pre><code class="language-python">import httpx, json
+
+with httpx.stream("POST", "https://your-domain/v1/chat/completions",
+                  headers={"Authorization": "Bearer kw-..."},
+                  json={"model": "olmo-2-1b-instruct", "stream": True,
+                        "messages": [{"role": "user", "content": "Привет"}]},
+                  timeout=300) as r:
+    for line in r.iter_lines():
+        if line.startswith("data: ") and line != "data: [DONE]":
+            delta = json.loads(line[6:])["choices"][0]["delta"]
+            print(delta.get("content", ""), end="", flush=True)</code></pre>
+
+  <h3>JavaScript (fetch, Node 18+ и браузер)</h3>
+<pre><code class="language-javascript">const res = await fetch("https://your-domain/v1/chat/completions", {
+  method: "POST",
+  headers: { "Authorization": `Bearer ${process.env.KIWION_API_KEY}`, "Content-Type": "application/json" },
+  body: JSON.stringify({
+    model: "olmo-2-1b-instruct",
+    stream: true,
+    messages: [{ role: "user", content: "Как дела, киви?" }],
+  }),
+});
+const reader = res.body.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+for (;;) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += decoder.decode(value, { stream: true });
+  const lines = buffer.split("\n");
+  buffer = lines.pop();
+  for (const line of lines) {
+    if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+    const delta = JSON.parse(line.slice(6)).choices[0]?.delta?.content;
+    if (delta) process.stdout.write(delta);
+  }
+}</code></pre>
+
+  <h3>JavaScript (пакет openai)</h3>
+<pre><code class="language-javascript">import OpenAI from "openai";
+const client = new OpenAI({ baseURL: "https://your-domain/v1", apiKey: process.env.KIWION_API_KEY });
+const r = await client.chat.completions.create({
+  model: "olmo-2-1b-instruct",
+  messages: [{ role: "user", content: "Привет!" }],
+});
+console.log(r.choices[0].message.content);</code></pre>
+
+  <h2>Лимиты</h2>
+  <p>У каждого ключа есть лимит запросов в минуту и дневной лимит токенов (значения видны в настройках, администратор может их изменить).
+  При превышении возвращается <code>429</code> с <code>rate_limit_exceeded</code> или <code>insufficient_quota</code> и заголовком <code>Retry-After</code>.</p>
+  <p>Если модель перегружена, ответ — <code>503</code> с кодом <code>overloaded</code>: повторите запрос позже с экспоненциальной задержкой.</p>
+
+  <h2>Ошибки</h2>
+  <table>
+    <tr><th>HTTP</th><th>code</th><th>Значение</th></tr>
+    <tr><td>400</td><td><code>invalid_request</code></td><td>Некорректный запрос</td></tr>
+    <tr><td>401</td><td><code>invalid_api_key</code></td><td>Ключ не найден или отозван</td></tr>
+    <tr><td>403</td><td><code>account_disabled</code></td><td>Аккаунт заблокирован или не подтверждён</td></tr>
+    <tr><td>404</td><td><code>model_not_found</code></td><td>Неизвестная модель</td></tr>
+    <tr><td>429</td><td><code>rate_limit_exceeded</code>, <code>insufficient_quota</code></td><td>Превышен лимит</td></tr>
+    <tr><td>503</td><td><code>overloaded</code>, <code>model_unavailable</code></td><td>Модель занята или недоступна</td></tr>
+  </table>
+  <p>Формат ошибки: <code>{"error": {"message": "...", "type": "...", "code": "..."}}</code>.</p>
+
+  <h2>Учёт токенов</h2>
+  <p>Каждый ответ содержит <code>usage</code> с реальным числом токенов, посчитанным llama.cpp. Статистика по дням — в настройках (вкладка «API-ключи»).</p>
+</div>
+</body>
+</html>

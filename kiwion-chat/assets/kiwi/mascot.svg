@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 200" width="220" height="200" role="img" aria-label="Fluffy Kiwi — маскот Kiwion Chat">
+  <title>Fluffy Kiwi</title>
+  <defs>
+    <radialGradient id="kw-body" cx="42%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#B9875A"/>
+      <stop offset="0.6" stop-color="#94643C"/>
+      <stop offset="1" stop-color="#6E4627"/>
+    </radialGradient>
+    <radialGradient id="kw-belly" cx="50%" cy="40%" r="60%">
+      <stop offset="0" stop-color="#E2C29A"/>
+      <stop offset="1" stop-color="#C79E70" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="kw-beak" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F3DDB8"/>
+      <stop offset="1" stop-color="#D9B07E"/>
+    </linearGradient>
+    <linearGradient id="kw-leaf" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3E9B3A"/>
+      <stop offset="1" stop-color="#8FD14F"/>
+    </linearGradient>
+  </defs>
+  <ellipse class="kw-shadow" cx="104" cy="186" rx="58" ry="8" fill="#000" opacity="0.12"/>
+  <g class="kw-legs" stroke="#C98E4F" stroke-width="6" stroke-linecap="round" fill="none">
+    <path d="M86 158 L82 180 M82 180 L70 184 M82 180 L84 186 M82 180 L92 184"/>
+    <path d="M118 158 L120 180 M120 180 L108 184 M120 180 L122 186 M120 180 L131 183"/>
+  </g>
+  <g class="kw-bird">
+    <g class="kw-fluff" fill="#8A5B35">
+      <circle cx="44" cy="112" r="14"/><circle cx="50" cy="92" r="14"/><circle cx="64" cy="76" r="14"/>
+      <circle cx="84" cy="66" r="14"/><circle cx="106" cy="62" r="14"/><circle cx="40" cy="132" r="13"/>
+      <circle cx="48" cy="150" r="13"/><circle cx="66" cy="162" r="13"/><circle cx="90" cy="168" r="13"/>
+      <circle cx="116" cy="166" r="13"/><circle cx="138" cy="156" r="13"/>
+    </g>
+    <g class="kw-wing kw-wing-back">
+      <ellipse cx="78" cy="86" rx="10" ry="17" fill="#6E4627" transform="rotate(-30 78 86)"/>
+    </g>
+    <ellipse class="kw-body" cx="100" cy="118" rx="60" ry="52" fill="url(#kw-body)"/>
+    <ellipse cx="108" cy="134" rx="36" ry="28" fill="url(#kw-belly)" opacity="0.8"/>
+    <g class="kw-fur" stroke="#6B4425" stroke-width="2" stroke-linecap="round" opacity="0.45" fill="none">
+      <path d="M62 104 q6 -4 10 2"/><path d="M70 126 q6 -4 10 2"/><path d="M58 140 q6 -4 10 2"/>
+      <path d="M90 90 q6 -4 10 2"/><path d="M84 150 q6 -4 10 2"/>
+    </g>
+    <g class="kw-head">
+      <circle cx="140" cy="92" r="32" fill="url(#kw-body)"/>
+      <g class="kw-sprout">
+        <path d="M134 62 q-2 -10 2 -16" stroke="#3E8E37" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M136 48 q-16 -8 -22 4 q12 6 22 -4z" fill="url(#kw-leaf)"/>
+        <path d="M136 48 q12 -14 24 -6 q-10 12 -24 6z" fill="url(#kw-leaf)"/>
+      </g>
+      <path class="kw-beak" d="M164 96 q20 6 40 34 q2 4 -3 3 q-22 -20 -40 -26z" fill="url(#kw-beak)" stroke="#C49563" stroke-width="1"/>
+      <ellipse class="kw-blush" cx="152" cy="104" rx="7" ry="4.5" fill="#F29B9B" opacity="0.7"/>
+      <g class="kw-eye">
+        <ellipse class="kw-eye-open" cx="150" cy="86" rx="6" ry="7" fill="#1E1410"/>
+        <circle class="kw-eye-open" cx="152" cy="83.5" r="2.2" fill="#fff"/>
+        <path class="kw-eye-closed" d="M143 87 q7 6 14 0" stroke="#1E1410" stroke-width="2.6" fill="none" stroke-linecap="round" opacity="0"/>
+      </g>
+    </g>
+    <g class="kw-wing kw-wing-front">
+      <ellipse cx="96" cy="120" rx="13" ry="20" fill="#86562F" transform="rotate(-18 96 120)"/>
+      <path d="M90 112 q6 6 4 16" stroke="#6B4425" stroke-width="1.6" fill="none" opacity="0.6"/>
+    </g>
+  </g>
+</svg>
