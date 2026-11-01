@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kiwion-chat"
+version = "1.0.0"
+description = "Kiwion Chat — AI platform by Kiwi_Fuzzy running OLMo 2 1B Instruct on its own llama.cpp inference"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Kiwi_Fuzzy" }]
+dependencies = [
+  "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+backend = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "sqlalchemy>=2.0",
+  "argon2-cffi>=23.1",
+  "pydantic>=2.6",
+  "email-validator>=2.1",
+]
+inference = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "pydantic>=2.6",
+]
+postgres = ["psycopg[binary]>=3.1"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "playwright>=1.40"]
+
+[project.scripts]
+kiwion = "kiwion_cli.main:main"
+kiwion-backend = "kiwion_backend.__main__:main"
+kiwion-inference = "kiwion_inference.__main__:main"
+
+[tool.setuptools]
+package-dir = { "kiwion_shared" = "shared/kiwion_shared", "kiwion_backend" = "backend/kiwion_backend", "kiwion_backend.routers" = "backend/kiwion_backend/routers", "kiwion_inference" = "inference/kiwion_inference", "kiwion_cli" = "cli/kiwion_cli" }
+packages = ["kiwion_shared", "kiwion_backend", "kiwion_backend.routers", "kiwion_inference", "kiwion_cli"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["shared", "backend", "inference", "cli"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

@@ -1,0 +1,6 @@
+__version__ = "1.0.0"
+PRODUCT_NAME = "Kiwion Chat"
+DEVELOPER = "Kiwi_Fuzzy"
+MODEL_ID = "olmo-2-1b-instruct"
+MODEL_DISPLAY_NAME = "OLMo 2 1B Instruct"
+MODEL_HF_REPO = "allenai/OLMo-2-0425-1B-Instruct"

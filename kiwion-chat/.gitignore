@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+.env
+data/
+models/*.gguf
+models/hf/
+third_party/
+node_modules/
+mobile/build/
+mobile/*.keystore
+mobile/keystore/
+deploy/certs/
+test-results/
