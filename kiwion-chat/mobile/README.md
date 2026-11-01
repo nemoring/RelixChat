@@ -17,9 +17,24 @@ KIWION_SERVER_URL=https://chat.example.com ./build_apk.sh
 (без этих переменных создаётся debug-ключ в `keystore/`, он не коммитится).
 Для теста с локальным http-сервером: `KIWION_ALLOW_CLEARTEXT=1 KIWION_SERVER_URL=http://192.168.1.10:8080 ./build_apk.sh`.
 
-## Android Studio
+## Android Studio / Gradle
 
-Откройте каталог `mobile/` — это обычный Gradle-проект (`app/build.gradle`, AGP 8.5).
+Откройте каталог `mobile/` — это обычный Gradle-проект (`app/build.gradle`, AGP 8.5.2, compileSdk 34).
+Из командной строки (нужен Android SDK: `platforms;android-34`, `build-tools;34.0.0`):
+
+```bash
+echo "sdk.dir=$ANDROID_HOME" > local.properties
+gradle assembleDebug                      # app/build/outputs/apk/debug/app-debug.apk
+KIWION_KEYSTORE=/path/release.jks KIWION_KEYSTORE_PASS=… KIWION_KEY_ALIAS=kiwion gradle assembleRelease
+gradle lintDebug                          # Android Lint
+```
+
+## Тесты
+
+`./run_ui_tests.sh` — Robolectric-тесты: запускает локальный backend и инференс (тестовый движок) и
+прогоняет настоящий код приложения на Android 14 в JVM: экран запуска, пасхалку целиком, регистрацию
+с proof-of-work и кодом из письма, стриминг ответа, остановку генерации, сохранение текста при отказе.
+Без запущенного сервера (`gradle testDebugUnitTest`) выполняются только офлайн-тесты.
 
 ## Экраны
 

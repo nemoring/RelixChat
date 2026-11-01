@@ -32,9 +32,24 @@ android {
         }
     }
 
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            all {
+                // live UI tests talk to a running Kiwion backend (see run_ui_tests.sh)
+                systemProperty "kiwion.testServer", System.getenv("KIWION_TEST_SERVER") ?: ""
+                testLogging { events "passed", "skipped", "failed"; exceptionFormat "full" }
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
 }
-// No third-party dependencies: the app uses only the Android framework.
+// The app itself uses only the Android framework; these are test-only dependencies.
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.robolectric:robolectric:4.13"
+}

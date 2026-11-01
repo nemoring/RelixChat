@@ -14,3 +14,6 @@ mobile/*.keystore
 mobile/keystore/
 deploy/certs/
 test-results/
+mobile/local.properties
+mobile/.gradle/
+mobile/app/build/
