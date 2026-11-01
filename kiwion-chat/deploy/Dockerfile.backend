@@ -1,0 +1,18 @@
+# Kiwion Backend (+ web, admin, docs) — small image for a cheap VPS
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY pyproject.toml README.md ./
+COPY shared shared
+COPY backend backend
+COPY inference inference
+COPY cli cli
+RUN pip install --no-cache-dir ".[backend,postgres]"
+COPY web web
+COPY admin admin
+COPY assets assets
+RUN useradd -r -u 10001 kiwion && mkdir -p /app/data && chown kiwion /app/data
+USER kiwion
+EXPOSE 8080
+ENV KIWION_HOST=0.0.0.0 KIWION_PORT=8080 KIWION_TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8
+CMD ["python", "-m", "kiwion_backend"]

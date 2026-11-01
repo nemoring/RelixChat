@@ -1,0 +1,21 @@
+# VPS backend without Docker. Put Caddy or nginx with TLS in front of 127.0.0.1:8080.
+[Unit]
+Description=Kiwion Backend API
+After=network-online.target
+
+[Service]
+User=kiwion
+WorkingDirectory=/opt/kiwion-chat
+EnvironmentFile=/opt/kiwion-chat/.env
+Environment=KIWION_ENV=production KIWION_HTTPS=1 KIWION_TRUSTED_PROXIES=127.0.0.1
+ExecStart=/opt/kiwion-chat/.venv/bin/python -m kiwion_backend
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/kiwion-chat/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

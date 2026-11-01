@@ -54,6 +54,14 @@ def create_app(settings: Settings | None = None, inference: InferenceClient | No
                            allow_headers=["Authorization", "Content-Type", "X-Api-Key"])
 
     @app.middleware("http")
+    async def method_override(request: Request, call_next):
+        # Android's HttpURLConnection cannot send PATCH; allow POST + X-HTTP-Method-Override.
+        override = request.headers.get("x-http-method-override", "").upper()
+        if request.method == "POST" and override in ("PATCH", "PUT", "DELETE"):
+            request.scope["method"] = override
+        return await call_next(request)
+
+    @app.middleware("http")
     async def security_headers(request: Request, call_next):
         if request.url.path.startswith("/v1/") is False and request.url.path.startswith("/api/") \
                 and request.headers.get("content-length", "0").isdigit() \

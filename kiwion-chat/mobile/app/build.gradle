@@ -1,0 +1,40 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "dev.kiwifuzzy.kiwion"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "dev.kiwifuzzy.kiwion"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            if (System.getenv("KIWION_KEYSTORE")) {
+                storeFile file(System.getenv("KIWION_KEYSTORE"))
+                storePassword System.getenv("KIWION_KEYSTORE_PASS")
+                keyAlias System.getenv("KIWION_KEY_ALIAS") ?: "kiwion"
+                keyPassword System.getenv("KIWION_KEYSTORE_PASS")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv("KIWION_KEYSTORE")) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+// No third-party dependencies: the app uses only the Android framework.

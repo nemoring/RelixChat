@@ -1,0 +1,13 @@
+# Home computer: the inference node only (llama.cpp + Kiwion Inference).
+#   scripts/download_model.sh            # puts the GGUF into ./models
+#   docker compose -f deploy/docker-compose.inference.yml up -d --build
+services:
+  inference:
+    build: { context: .., dockerfile: deploy/Dockerfile.inference }
+    env_file: ../.env
+    volumes:
+      - ../models:/models:ro
+      - ./certs:/app/certs:ro
+    ports: ["8090:8090"]    # expose only on the WireGuard interface, e.g. "10.8.0.2:8090:8090"
+    restart: unless-stopped
+    mem_limit: 3g

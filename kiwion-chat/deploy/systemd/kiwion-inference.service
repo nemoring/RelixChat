@@ -1,0 +1,28 @@
+# Home inference node. Install:
+#   sudo cp deploy/systemd/kiwion-inference.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now kiwion-inference
+[Unit]
+Description=Kiwion Inference (OLMo 2 1B via llama.cpp)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=kiwion
+WorkingDirectory=/opt/kiwion-chat
+EnvironmentFile=/opt/kiwion-chat/.env
+ExecStart=/opt/kiwion-chat/.venv/bin/python -m kiwion_inference
+Restart=always
+RestartSec=5
+# keep the desktop responsive on a 2-core laptop CPU
+Nice=5
+CPUWeight=80
+MemoryMax=3G
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/kiwion-chat
+PrivateTmp=true
+Environment=KIWION_LOG_DIR=/opt/kiwion-chat/data/logs
+
+[Install]
+WantedBy=multi-user.target

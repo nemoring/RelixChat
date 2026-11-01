@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="KiwiTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#2E8B3E</item>
+        <item name="android:colorPrimaryDark">#1F5F2A</item>
+        <item name="android:colorAccent">#4CAF50</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+    <style name="KiwiSplash" parent="KiwiTheme">
+        <item name="android:windowBackground">@drawable/splash</item>
+    </style>
+</resources>

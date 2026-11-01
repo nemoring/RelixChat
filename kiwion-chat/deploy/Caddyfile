@@ -1,0 +1,15 @@
+{$KIWION_DOMAIN} {
+	encode zstd gzip
+	# streaming responses (chat + /v1/chat/completions) must not be buffered
+	reverse_proxy backend:8080 {
+		flush_interval -1
+		header_up X-Real-IP {remote_host}
+	}
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		-Server
+	}
+	request_body {
+		max_size 2MB
+	}
+}

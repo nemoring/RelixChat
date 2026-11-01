@@ -108,3 +108,11 @@ def test_maintenance_mode(client):
 def test_model_status_public(client):
     s = client.get("/api/model/status").json()
     assert s["state"] == "online" and s["engine"] == "mock"
+
+
+def test_method_override_for_android(client):
+    h = register(client, "andr@kiwion.dev")
+    chat = client.post("/api/chats", json={}, headers=h).json()
+    r = client.post(f"/api/chats/{chat['id']}", json={"title": "via override"},
+                    headers={**h, "X-HTTP-Method-Override": "PATCH"})
+    assert r.status_code == 200 and r.json()["title"] == "via override"

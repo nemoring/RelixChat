@@ -1,0 +1,10 @@
+// Android Studio / Gradle build of Kiwion Chat (alternative to build_apk.sh).
+pluginManagement {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories { google(); mavenCentral() }
+}
+rootProject.name = "KiwionChat"
+include ":app"
