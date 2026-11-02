@@ -28,7 +28,7 @@ apt-get install -y -q python3 python3-venv python3-dev build-essential cmake cad
 say "copying Kiwion to $APP"
 id kiwion >/dev/null 2>&1 || useradd -r -m -d /var/lib/kiwion -s /usr/sbin/nologin kiwion
 mkdir -p "$APP"
-rsync -a --delete --exclude .env --exclude data --exclude models --exclude .venv --exclude third_party/llama.cpp/build \
+rsync -a --delete --exclude .env --exclude data --exclude models --exclude .venv --exclude third_party \
   "$SRC/kiwion-chat/" "$APP/"
 mkdir -p "$APP/data" "$APP/models/hf" "$APP/third_party"
 rsync -a --exclude build "$SRC/llama.cpp/" "$APP/third_party/llama.cpp/"

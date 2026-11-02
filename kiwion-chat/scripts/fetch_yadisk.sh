@@ -3,6 +3,7 @@
 #   scripts/fetch_yadisk.sh https://disk.yandex.ru/d/XXXX output-file
 set -euo pipefail
 LINK="${1:?public Yandex Disk link}"; OUT="${2:?output file}"
+case "$LINK" in https://disk.yandex.*|https://yadi.sk/*) ;; *) echo "not a Yandex Disk link: $LINK"; exit 1 ;; esac
 HREF="$(curl -fsSG https://cloud-api.yandex.net/v1/disk/public/resources/download --data-urlencode "public_key=$LINK" \
   | sed -n 's/.*"href":"\([^"]*\)".*/\1/p')"
 [ -n "$HREF" ] || { echo "Yandex Disk did not return a download link (is the link public?)"; exit 1; }
