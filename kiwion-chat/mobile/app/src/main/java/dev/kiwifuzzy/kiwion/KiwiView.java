@@ -84,7 +84,8 @@ public class KiwiView extends View {
         p.setColor(0xFF6E4627);
         ellipse(c, 78, 86, 10, 17);
         c.restore();
-        // body
+        // body (paint alpha multiplies the shader, so reset it to opaque first)
+        p.setColor(0xFFFFFFFF);
         p.setShader(bodyShader);
         ellipse(c, 100, 118, 60, 52);
         p.setShader(null);
@@ -105,6 +106,7 @@ public class KiwiView extends View {
         // head
         c.save();
         c.rotate(headTilt, 128, 112);
+        p.setColor(0xFFFFFFFF);   // previous fur strokes left a translucent alpha in the paint
         p.setShader(headShader);
         c.drawCircle(140, 92, 32, p);
         p.setShader(null);
