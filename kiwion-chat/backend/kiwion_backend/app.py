@@ -34,12 +34,16 @@ def create_app(settings: Settings | None = None, inference: InferenceClient | No
     settings = settings or get_settings()
     db = Database(settings.database_url)
     db.create_all()
-    st = AppState(settings=settings, db=db, store=SettingsStore(db.SessionLocal), limiter=RateLimiter(),
-                  pow=ProofOfWork(settings.secret_key, settings.pow_difficulty), mailer=Mailer(settings),
+    store = SettingsStore(db.SessionLocal, secret_key=settings.secret_key)
+    st = AppState(settings=settings, db=db, store=store, limiter=RateLimiter(),
+                  pow=ProofOfWork(settings.secret_key, settings.pow_difficulty),
+                  mailer=Mailer(settings, store, db.SessionLocal),
                   inference=inference or InferenceClient(settings))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if settings.env == "production" and st.mailer.config().mode != "smtp":
+            log.warning("e-mail delivery is not configured: open /admin/ → Почта (codes will not reach users)")
         yield
         await st.inference.aclose()
 

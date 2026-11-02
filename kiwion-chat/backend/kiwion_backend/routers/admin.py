@@ -9,8 +9,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session as DBSession
 
-from ..db import (ApiKey, AuditLog, Chat, ErrorLog, Message, Referral, Session, UsageEvent, User,
-                  utcnow)
+from pydantic import EmailStr
+
+from ..db import (ApiKey, AuditLog, Chat, EmailToken, ErrorLog, MailLog, Message, Referral, Session, UsageEvent,
+                  User, utcnow)
+from ..mailer import PRESETS
 from ..deps import admin_user, api_error, get_db, state
 from ..referrals import admin_decide
 from ..security import mask_email
@@ -211,3 +214,101 @@ def audit_log(limit: int = 100, db: DBSession = Depends(get_db)):
         out.append({"id": r.id, "created_at": _iso(r.created_at), "admin": mask_email(a.email) if a else None,
                     "action": r.action, "target": r.target, "details": json.loads(r.details or "{}")})
     return out
+
+
+# ------------------------------------------------------------------ e-mail
+class MailSettingsIn(BaseModel):
+    mode: str = Field(pattern="^(smtp|file|console|env)$")   # env = use values from .env
+    host: str = Field(default="", max_length=255)
+    port: int = Field(default=465, ge=1, le=65535)
+    security: str = Field(default="ssl", pattern="^(ssl|starttls|none)$")
+    user: str = Field(default="", max_length=255)
+    sender: str = Field(default="", max_length=255)
+    password: str | None = Field(default=None, max_length=255)   # None = keep the saved one
+    clear_password: bool = False
+
+
+def _mail_state(request: Request, db: DBSession) -> dict:
+    st = state(request)
+    cfg = st.mailer.config()
+    logs = db.scalars(select(MailLog).order_by(MailLog.id.desc()).limit(50)).all()
+    since = utcnow() - dt.timedelta(days=1)
+    failed = db.scalar(select(func.count(MailLog.id)).where(MailLog.status == "failed", MailLog.created_at >= since)) or 0
+    sent = db.scalar(select(func.count(MailLog.id)).where(MailLog.status == "sent", MailLog.created_at >= since)) or 0
+    return {
+        "config": {"mode": cfg.mode, "source": cfg.source, "host": cfg.host, "port": cfg.port,
+                   "security": cfg.security, "user": cfg.user, "sender": cfg.sender,
+                   "has_password": bool(cfg.password)},
+        "presets": PRESETS,
+        "stats_24h": {"sent": sent, "failed": failed},
+        "log": [{"id": m.id, "created_at": _iso(m.created_at), "to": m.to_masked, "subject": m.subject,
+                 "status": m.status, "error": m.error} for m in logs],
+    }
+
+
+@router.get("/mail")
+def mail_settings(request: Request, db: DBSession = Depends(get_db)):
+    return _mail_state(request, db)
+
+
+@router.put("/mail")
+def put_mail_settings(body: MailSettingsIn, request: Request, admin: User = Depends(admin_user),
+                      db: DBSession = Depends(get_db)):
+    st = state(request)
+    if body.mode == "smtp" and not body.host.strip():
+        raise api_error(400, "bad_setting", "Укажите SMTP-сервер")
+    st.store.update({"mail_mode": "" if body.mode == "env" else body.mode, "smtp_host": body.host.strip(),
+                     "smtp_port": body.port, "smtp_security": body.security, "smtp_user": body.user.strip(),
+                     "mail_from": body.sender.strip()})
+    if body.clear_password:
+        st.store.set_secret("smtp_password", None)
+    elif body.password:
+        st.store.set_secret("smtp_password", body.password.replace(" ", "") if body.host.endswith("gmail.com") else body.password)
+    audit(db, admin, "mail.update", "", {"mode": body.mode, "host": body.host, "port": body.port,
+                                         "user": body.user, "password_changed": bool(body.password or body.clear_password)})
+    db.commit()
+    return _mail_state(request, db)
+
+
+@router.post("/mail/check")
+def mail_check(request: Request):
+    steps = state(request).mailer.check()
+    return {"ok": all(s["ok"] for s in steps), "steps": steps}
+
+
+class MailTestIn(BaseModel):
+    to: EmailStr
+
+
+@router.post("/mail/test")
+def mail_test(body: MailTestIn, request: Request, admin: User = Depends(admin_user), db: DBSession = Depends(get_db)):
+    st = state(request)
+    try:
+        st.mailer.send_test(str(body.to))
+    except Exception as e:
+        return {"ok": False, "message": f"Письмо не отправлено: {type(e).__name__}: {e}"}
+    mode = st.mailer.config().mode
+    msg = {"smtp": "Письмо отправлено — проверьте ящик (и папку «Спам»)",
+           "file": "Режим «файл»: письмо сохранено в data/outbox на сервере, на почту оно не уходит"}.get(
+        mode, "Режим «консоль»: письмо только записано в лог сервера")
+    return {"ok": True, "message": msg}
+
+
+@router.post("/users/{user_id}/resend-verification")
+def admin_resend(user_id: int, request: Request, admin: User = Depends(admin_user), db: DBSession = Depends(get_db)):
+    from .auth import _issue_email_token
+    st = state(request)
+    u = db.get(User, user_id)
+    if u is None:
+        raise api_error(404, "not_found", "Пользователь не найден")
+    if u.is_verified:
+        return {"ok": True, "message": "Email уже подтверждён"}
+    token = _issue_email_token(db, st, u, "verify", 48)
+    db.commit()
+    try:
+        st.mailer.send_verification(u.email, token)
+    except Exception as e:
+        return {"ok": False, "message": f"Не удалось отправить: {e}"}
+    audit(db, admin, "user.resend_verification", f"user:{u.id}")
+    db.commit()
+    return {"ok": True, "message": f"Код отправлен на {u.email}"}

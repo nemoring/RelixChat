@@ -29,14 +29,28 @@ DEFAULTS: dict = {
     "referral_reject_threshold": 80,
     "max_accounts_per_device": 3,
     "signups_per_ip_per_hour": 5,
+    # e-mail (edited on the admin "Почта" page). mail_mode "" = use the values from .env
+    "mail_mode": "",
+    "smtp_host": "",
+    "smtp_port": 465,
+    "smtp_security": "ssl",
+    "smtp_user": "",
+    "mail_from": "",
 }
+MAIL_KEYS = ("mail_mode", "smtp_host", "smtp_port", "smtp_security", "smtp_user", "mail_from")
 
 _TYPES = {k: type(v) for k, v in DEFAULTS.items()}
 
 
 class SettingsStore:
-    def __init__(self, session_factory, ttl: float = 5.0):
+    def __init__(self, session_factory, ttl: float = 5.0, secret_key: str = ""):
         self._sf = session_factory
+        self._fernet = None
+        if secret_key:
+            import base64
+            import hashlib
+            from cryptography.fernet import Fernet
+            self._fernet = Fernet(base64.urlsafe_b64encode(hashlib.sha256(("kiwion-settings:" + secret_key).encode()).digest()))
         self._cache: dict | None = None
         self._ts = 0.0
         self._ttl = ttl
@@ -87,3 +101,29 @@ class SettingsStore:
         with self._lock:
             self._cache = None
         return self.all()
+
+    # --- encrypted secrets (e.g. SMTP password): stored encrypted, never returned by the API
+    def set_secret(self, key: str, value: str | None) -> None:
+        name = "secret:" + key
+        with self._sf() as s:
+            row = s.get(Setting, name)
+            if not value:
+                if row:
+                    s.delete(row)
+            else:
+                token = self._fernet.encrypt(value.encode()).decode()
+                if row:
+                    row.value = token
+                else:
+                    s.add(Setting(key=name, value=token))
+            s.commit()
+
+    def get_secret(self, key: str) -> str:
+        with self._sf() as s:
+            row = s.get(Setting, "secret:" + key)
+            if not row or not self._fernet:
+                return ""
+            try:
+                return self._fernet.decrypt(row.value.encode()).decode()
+            except Exception:
+                return ""

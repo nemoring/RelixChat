@@ -237,11 +237,36 @@ def test_admin_panel(server):
         if shots:
             page.screenshot(path=f"{shots}/10-admin.png")
         for hash_, title in [("inference", "Модель и очередь"), ("users", "Пользователи"), ("referrals", "Рефералы"),
-                             ("settings", "Лимиты и доступность"), ("errors", "Системные ошибки"), ("audit", "Журнал")]:
+                             ("settings", "Лимиты и доступность"), ("mail", "Почта"), ("errors", "Системные ошибки"),
+                             ("audit", "Журнал")]:
             page.goto(f"{base}/admin/#/{hash_}")
             page.wait_for_selector(f"h1 >> text={title}")
+        # mail page: Gmail preset, save, diagnostics, test mail in file mode
+        page.goto(f"{base}/admin/#/mail")
+        page.wait_for_selector("#mf")
+        page.click("[data-preset=gmail]")
+        assert page.input_value("[name=host]") == "smtp.gmail.com" and page.input_value("[name=port]") == "465"
+        assert "пароль приложения" in page.inner_text("#phint")
+        page.fill("[name=user]", "kiwion.bot@gmail.com")
+        page.fill("[name=password]", "abcd efgh ijkl mnop")
+        assert page.input_value("[name=sender]") == "Kiwion Chat <kiwion.bot@gmail.com>"   # follows the login
+        page.click("#mf button[type=submit]")
+        page.wait_for_selector("[name=password][placeholder^='сохранён']")
+        assert page.input_value("[name=sender]") == "Kiwion Chat <kiwion.bot@gmail.com>"
+        if shots:
+            page.screenshot(path=f"{shots}/11-admin-mail.png", full_page=True)
+        page.select_option("[name=mode]", "file")
+        page.click("#mf button[type=submit]")
+        page.wait_for_selector(".notice.warn >> text=не уходят на почту")   # page re-rendered in file mode
+        page.fill("#mto", "boss@kiwion.dev")
+        page.click("#mtest")
+        page.wait_for_selector("#mres >> text=Режим «файл»")
+        page.goto(f"{base}/admin/#/users")
+        page.wait_for_selector("h1 >> text=Пользователи")
+
         page.goto(f"{base}/admin/#/settings")
         page.wait_for_selector("[name=registration_open]")
+        assert page.locator("[name=smtp_host]").count() == 0     # mail settings live on their own page
         page.uncheck("[name=registration_open]")
         page.click("#sf button[type=submit]")
         page.wait_for_selector(".toast >> text=Настройки сохранены")

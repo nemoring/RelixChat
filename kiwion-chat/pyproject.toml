@@ -20,6 +20,7 @@ backend = [
   "uvicorn[standard]>=0.29",
   "sqlalchemy>=2.0",
   "argon2-cffi>=23.1",
+  "cryptography>=42",
   "pydantic>=2.6",
   "email-validator>=2.1",
 ]

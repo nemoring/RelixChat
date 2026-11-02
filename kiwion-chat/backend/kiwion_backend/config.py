@@ -62,8 +62,6 @@ class Settings:
                 raise SystemExit("KIWION_SECRET_KEY must be at least 32 characters")
             if not self.inference_secret:
                 raise SystemExit("KIWION_INFERENCE_SECRET must be set in production")
-            if self.mail_mode != "smtp":
-                raise SystemExit("KIWION_MAIL_MODE must be 'smtp' in production")
 
     @property
     def is_sqlite(self) -> bool:

@@ -184,6 +184,16 @@ class ErrorLog(Base):
     message: Mapped[str] = mapped_column(Text)
 
 
+class MailLog(Base):
+    __tablename__ = "mail_logs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    to_masked: Mapped[str] = mapped_column(String(320))
+    subject: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(16))   # sent | stored | logged | failed
+    error: Mapped[str] = mapped_column(Text, default="")
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

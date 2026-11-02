@@ -19,7 +19,7 @@ function toast(msg, bad) {
 }
 
 const PAGES = [["dashboard", "Обзор"], ["inference", "Модель и очередь"], ["users", "Пользователи"], ["referrals", "Рефералы"],
-  ["settings", "Лимиты и доступность"], ["errors", "Системные ошибки"], ["audit", "Журнал действий"]];
+  ["settings", "Лимиты и доступность"], ["mail", "Почта"], ["errors", "Системные ошибки"], ["audit", "Журнал действий"]];
 
 function loginForm(msg) {
   root.innerHTML = `<div class="screen"><div class="auth-wrap"><div class="auth-head"><img src="/assets/kiwi/logo.png" width="84" height="84" style="border-radius:22px" alt="">
@@ -125,7 +125,8 @@ async function users(main, q = "", status = "", page = 1) {
       <td>${u.role === "admin" ? '<span class="badge ok">admin</span> ' : ""}${u.is_banned ? `<span class="badge bad" title="${esc(u.ban_reason)}">бан</span>` : u.is_verified ? '<span class="badge ok">активен</span>' : '<span class="badge warn">не подтв.</span>'}</td>
       <td>${dt(u.created_at)}</td><td>${u.daily_token_limit == null ? '<span class="hint">по умолч.</span>' : num(u.daily_token_limit)}</td>
       <td>${num(u.bonus_tokens)}</td><td>${u.chats}</td>
-      <td style="white-space:nowrap"><button class="btn ghost small" data-limit="${u.id}">Лимит</button>
+      <td style="white-space:nowrap">${u.is_verified ? "" : `<button class="btn ghost small" data-resend="${u.id}" title="Отправить письмо с кодом ещё раз">Код</button>
+      <button class="btn ghost small" data-verify="${u.id}" title="Подтвердить email вручную">Подтв.</button> `}<button class="btn ghost small" data-limit="${u.id}">Лимит</button>
       <button class="btn ghost small" data-bonus="${u.id}">Бонус</button>
       ${u.is_banned ? `<button class="btn small" data-unban="${u.id}">Разбанить</button>` : `<button class="btn danger small" data-ban="${u.id}">Бан</button>`}</td></tr>`).join("")}
     </table></div>
@@ -139,6 +140,9 @@ async function users(main, q = "", status = "", page = 1) {
   $("#next")?.addEventListener("click", () => reload(page + 1));
   const patch = async (id, body) => { try { await api(`/api/admin/users/${id}`, { method: "PATCH", body }); toast("Сохранено"); reload(); } catch (e) { toast(e.message, true); } };
   $$("[data-ban]").forEach((b) => b.addEventListener("click", () => { const r = prompt("Причина блокировки:", "Нарушение правил"); if (r !== null) patch(b.dataset.ban, { is_banned: true, ban_reason: r }); }));
+  $$("[data-resend]").forEach((b) => b.addEventListener("click", async () => {
+    const r = await api(`/api/admin/users/${b.dataset.resend}/resend-verification`, { method: "POST" }); toast(r.message, !r.ok); }));
+  $$("[data-verify]").forEach((b) => b.addEventListener("click", () => { if (confirm("Подтвердить email этого пользователя вручную?")) patch(b.dataset.verify, { is_verified: true }); }));
   $$("[data-unban]").forEach((b) => b.addEventListener("click", () => patch(b.dataset.unban, { is_banned: false })));
   $$("[data-limit]").forEach((b) => b.addEventListener("click", () => { const v = prompt("Дневной лимит токенов (-1 = по умолчанию):", ""); if (v !== null && v.trim() !== "") patch(b.dataset.limit, { daily_token_limit: parseInt(v, 10) }); }));
   $$("[data-bonus]").forEach((b) => b.addEventListener("click", () => { const v = prompt("Бонусные токены (новое значение):", ""); if (v !== null && v.trim() !== "") patch(b.dataset.bonus, { bonus_tokens: parseInt(v, 10) }); }));
@@ -178,7 +182,9 @@ const SETTING_LABELS = {
 };
 
 async function settings(main) {
-  const s = await api("/api/admin/settings");
+  const all = await api("/api/admin/settings");
+  const MAIL = ["mail_mode", "smtp_host", "smtp_port", "smtp_security", "smtp_user", "mail_from"];
+  const s = Object.fromEntries(Object.entries(all).filter(([k]) => !MAIL.includes(k)));
   const bools = Object.keys(s).filter((k) => typeof s[k] === "boolean");
   const others = Object.keys(s).filter((k) => typeof s[k] !== "boolean");
   main.innerHTML = `<h1>Лимиты и доступность</h1><form class="card" id="sf">
@@ -213,7 +219,86 @@ async function audit(main) {
       <td><code>${esc(JSON.stringify(r.details))}</code></td></tr>`).join("") || '<tr><td colspan="5" class="hint">Пусто</td></tr>'}</table></div>`;
 }
 
-const HANDLERS = { dashboard, inference, users, referrals, settings, errors, audit };
+const STATUS_RU = { sent: ["ok", "отправлено"], failed: ["bad", "ошибка"], stored: ["warn", "в файл (тест)"], logged: ["warn", "в лог"] };
+
+async function mail(main) {
+  const d = await api("/api/admin/mail");
+  const c = d.config;
+  const modeNow = c.source === "env" ? "env" : c.mode;
+  main.innerHTML = `<h1>Почта</h1>
+    ${c.mode !== "smtp" ? `<div class="notice warn">Письма с кодами сейчас <b>не уходят на почту</b> (режим «${esc(c.mode)}»). Настройте SMTP ниже.</div>` : ""}
+    <div class="stat-grid"><div class="stat"><b>${d.stats_24h.sent}</b><span>отправлено за 24 ч</span></div>
+      <div class="stat"><b>${d.stats_24h.failed}</b><span>ошибок за 24 ч</span></div>
+      <div class="stat"><b>${c.source === "admin" ? "админ-панель" : ".env"}</b><span>откуда настройки</span></div></div>
+    <form class="card" id="mf">
+      <h3 style="margin-top:0">Отправка писем (коды подтверждения и восстановления пароля)</h3>
+      <div class="toolbar"><span class="hint">Шаблон:</span>${Object.keys(d.presets).map((k) => `<button type="button" class="btn ghost small" data-preset="${k}">${{ gmail: "Gmail", yandex: "Яндекс", mailru: "Mail.ru" }[k] || k}</button>`).join("")}</div>
+      <p class="hint" id="phint"></p>
+      <div class="settings-form">
+        <div class="field"><label>Режим</label><select class="input" name="mode">
+          <option value="smtp">SMTP — отправлять на почту</option><option value="file">Файл (только для тестов)</option>
+          <option value="console">Лог сервера (только для тестов)</option><option value="env">Брать настройки из .env</option></select></div>
+        <div class="field"><label>SMTP-сервер</label><input class="input" name="host" placeholder="smtp.gmail.com" value="${esc(c.host)}"></div>
+        <div class="field"><label>Порт</label><input class="input" name="port" type="number" value="${c.port || 465}"></div>
+        <div class="field"><label>Шифрование</label><select class="input" name="security">
+          <option value="ssl">SSL (порт 465)</option><option value="starttls">STARTTLS (порт 587)</option><option value="none">Без шифрования</option></select></div>
+        <div class="field"><label>Логин (адрес почты)</label><input class="input" name="user" autocomplete="off" value="${esc(c.user)}"></div>
+        <div class="field"><label>Пароль приложения</label><input class="input" name="password" type="password" autocomplete="new-password"
+          placeholder="${c.has_password ? "сохранён — оставьте пустым, чтобы не менять" : "не задан"}"></div>
+        <div class="field"><label>Отправитель</label><input class="input" name="sender" placeholder="Kiwion Chat &lt;you@gmail.com&gt;" value="${esc(c.sender)}"></div>
+      </div>
+      <p class="hint">Пароль хранится на сервере в зашифрованном виде и никогда не показывается.</p>
+      <div class="toolbar"><button class="btn" type="submit">Сохранить</button>
+        <button class="btn ghost" type="button" id="mcheck">Проверить подключение</button>
+        <input class="input" id="mto" type="email" placeholder="куда отправить тест" style="max-width:240px">
+        <button class="btn ghost" type="button" id="mtest">Отправить тестовое письмо</button></div>
+      <div id="mres"></div>
+    </form>
+    <div class="card" style="margin-top:14px;padding:0;overflow-x:auto"><table class="data"><tr><th>Время</th><th>Кому</th><th>Тема</th><th>Статус</th><th>Ошибка</th></tr>
+      ${d.log.map((m) => `<tr><td style="white-space:nowrap">${dt(m.created_at)}</td><td>${esc(m.to)}</td><td>${esc(m.subject)}</td>
+        <td><span class="badge ${STATUS_RU[m.status]?.[0] || ""}">${STATUS_RU[m.status]?.[1] || esc(m.status)}</span></td><td class="hint">${esc(m.error)}</td></tr>`).join("") || '<tr><td colspan="5" class="hint">Писем пока не было</td></tr>'}</table></div>`;
+  const f = $("#mf");
+  f.mode.value = modeNow; f.security.value = c.security || "ssl";
+  // the sender follows the login (Gmail/Yandex replace any other sender) unless the admin edits it by hand
+  const looksDefault = (v) => !v || /kiwion\.local|example\.com/.test(v) || (c.user && v === `Kiwion Chat <${c.user}>`);
+  let senderTouched = !looksDefault(f.sender.value);
+  if (!senderTouched && c.user) f.sender.value = `Kiwion Chat <${c.user}>`;
+  f.sender.addEventListener("input", () => { senderTouched = true; });
+  const syncSender = () => { if (!senderTouched) f.sender.value = f.user.value.trim() ? `Kiwion Chat <${f.user.value.trim()}>` : ""; };
+  f.user.addEventListener("input", syncSender);
+  $$("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+    const p = d.presets[b.dataset.preset];
+    f.mode.value = "smtp"; f.host.value = p.smtp_host; f.port.value = p.smtp_port; f.security.value = p.smtp_security;
+    $("#phint").textContent = p.hint;
+    syncSender();
+  }));
+  f.port.addEventListener("change", () => { if (f.port.value === "465") f.security.value = "ssl"; if (f.port.value === "587") f.security.value = "starttls"; });
+  const body = () => ({ mode: f.mode.value, host: f.host.value.trim(), port: parseInt(f.port.value, 10) || 465, security: f.security.value,
+    user: f.user.value.trim(), sender: f.sender.value.trim() || (f.user.value.trim() ? `Kiwion Chat <${f.user.value.trim()}>` : ""),
+    password: f.password.value || null });
+  const show = (html) => ($("#mres").innerHTML = html);
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try { await api("/api/admin/mail", { method: "PUT", body: body() }); toast("Сохранено"); mail(main); }
+    catch (err) { toast(err.message, true); }
+  });
+  $("#mcheck").addEventListener("click", async () => {
+    show('<p class="hint">Проверяем… (до 30 секунд)</p>');
+    const r = await api("/api/admin/mail/check", { method: "POST" });
+    show(`<div class="notice ${r.ok ? "" : "bad"}">${r.ok ? "✅ Подключение к почтовому серверу работает" : "Есть проблема:"}
+      <ul style="margin:6px 0 0">${r.steps.map((s) => `<li>${s.ok ? "✅" : "❌"} <b>${esc(s.step)}</b>: ${esc(s.message)}${s.hint ? `<br><span class="hint">${esc(s.hint)}</span>` : ""}</li>`).join("")}</ul></div>`);
+  });
+  $("#mtest").addEventListener("click", async () => {
+    const to = $("#mto").value.trim();
+    if (!to) return toast("Укажите адрес для теста", true);
+    show('<p class="hint">Отправляем…</p>');
+    try { const r = await api("/api/admin/mail/test", { method: "POST", body: { to } });
+      show(`<div class="notice ${r.ok ? "" : "bad"}">${esc(r.message)}</div>`); }
+    catch (err) { show(`<div class="notice bad">${esc(err.message)}</div>`); }
+  });
+}
+
+const HANDLERS = { dashboard, inference, users, referrals, settings, mail, errors, audit };
 
 async function boot() {
   if (!auth.token) return loginForm();

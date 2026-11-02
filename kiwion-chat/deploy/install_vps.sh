@@ -9,6 +9,10 @@
 # Without WITH_MODEL the inference node (home PC) is connected via WireGuard (see docs/DEPLOYMENT.md).
 # With WITH_MODEL=1 you need >= 4 GB RAM and 2+ vCPU; llama.cpp is built and the original
 # OLMo 2 weights are downloaded and converted to GGUF here (takes 15-40 minutes once).
+#
+# A single run installs everything. E-mail (SMTP) is configured afterwards in the admin panel
+# (https://<domain>/admin/ → «Почта»); the admin account and its password are created by this script.
+# Safe to re-run: it updates the code and restarts the services.
 set -euo pipefail
 DOMAIN="${1:?usage: install_vps.sh <domain> <admin-email> <git-url> [branch]}"
 ADMIN="${2:?admin e-mail required}"
@@ -20,7 +24,14 @@ apt-get update -q
 apt-get install -y -q ca-certificates curl git openssl ufw
 if ! command -v docker >/dev/null; then curl -fsSL https://get.docker.com | sh; fi
 
-if [ ! -d "$DIR/.git" ]; then git clone -b "$BRANCH" "$REPO" "$DIR"; else git -C "$DIR" pull --ff-only; fi
+if [ -d "$DIR/.git" ]; then
+  git -C "$DIR" fetch -q origin "$BRANCH" && git -C "$DIR" checkout -q "$BRANCH" && git -C "$DIR" pull -q --ff-only origin "$BRANCH"
+elif [ -d "$DIR" ]; then            # e.g. weights were uploaded to $DIR/kiwion-chat/models before the first run
+  git -C "$DIR" init -q && git -C "$DIR" remote add origin "$REPO" 2>/dev/null || true
+  git -C "$DIR" fetch -q origin "$BRANCH" && git -C "$DIR" checkout -q -f -B "$BRANCH" "origin/$BRANCH"
+else
+  git clone -q -b "$BRANCH" "$REPO" "$DIR"
+fi
 cd "$DIR/kiwion-chat"
 
 if [ ! -f .env ]; then
@@ -40,17 +51,11 @@ if [ ! -f .env ]; then
     set_env KIWION_INFERENCE_URL "http://10.8.0.2:8090"
   fi
   set_env KIWION_ADMIN_EMAILS "$ADMIN"
-  set_env KIWION_MAIL_MODE smtp
+  set_env KIWION_MAIL_MODE smtp      # SMTP server/password are set in the admin panel → «Почта»
   chmod 600 .env
-  mkdir -p models/hf
-  echo ">>> .env created. Fill in KIWION_SMTP_* (mail) in $DIR/kiwion-chat/.env, then re-run this script."
-  [ "${WITH_MODEL:-0}" = "1" ] && echo ">>> Already have the weights? Upload them now: a .gguf file to $DIR/kiwion-chat/models/ (set KIWION_MODEL_FILE in .env), or the original Hugging Face folder to $DIR/kiwion-chat/models/hf/OLMo-2-0425-1B-Instruct/"
-  if [ "${WITH_MODEL:-0}" != "1" ]; then
-    echo ">>> Copy KIWION_INFERENCE_SECRET to the home inference PC's .env:"
-    grep '^KIWION_INFERENCE_SECRET=' .env
-  fi
-  exit 0
+  echo ">>> created $DIR/kiwion-chat/.env with random secrets"
 fi
+mkdir -p models/hf
 
 ufw allow OpenSSH >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null
 [ "${WITH_MODEL:-0}" = "1" ] || ufw allow 51820/udp >/dev/null   # WireGuard to the home PC
@@ -79,7 +84,24 @@ docker compose --env-file .env -f deploy/docker-compose.vps.yml "${PROFILE[@]}" 
 for _ in $(seq 60); do
   curl -fsS "https://$DOMAIN/api/health" >/dev/null 2>&1 && break; sleep 3
 done
-curl -fsS "https://$DOMAIN/api/health" && echo
-echo "Kiwion Chat is up: https://$DOMAIN  (admin panel: https://$DOMAIN/admin/)"
-echo "Register $ADMIN on the site — it becomes an administrator after e-mail confirmation."
-echo "Android build for this server:  KIWION_SERVER_URL=https://$DOMAIN mobile/build_apk.sh"
+curl -fsS "https://$DOMAIN/api/health" && echo || echo "!!! https://$DOMAIN does not answer yet — see: docker compose --env-file .env -f deploy/docker-compose.vps.yml logs --tail=50"
+
+# administrator account (created once; the password is shown here and saved for root only)
+CRED=/root/kiwion-admin.txt
+if [ ! -f "$CRED" ]; then
+  PASS="Kiwi7$(openssl rand -hex 6)"
+  docker compose --env-file .env -f deploy/docker-compose.vps.yml exec -T backend \
+    python -m kiwion_backend create-admin --email "$ADMIN" --password "$PASS" >/dev/null
+  printf 'Kiwion admin\nurl: https://%s/admin/\nemail: %s\npassword: %s\n' "$DOMAIN" "$ADMIN" "$PASS" > "$CRED"
+  chmod 600 "$CRED"
+fi
+
+echo
+echo "================================================================"
+echo " Kiwion Chat is up:  https://$DOMAIN"
+echo " Admin panel:        https://$DOMAIN/admin/"
+cat "$CRED" | sed -n '3,4p' | sed 's/^/ /'
+echo " (saved in $CRED — change the password after the first login)"
+echo " Next: admin panel → «Почта» → set up Gmail/Yandex so users receive their codes."
+[ "${WITH_MODEL:-0}" = "1" ] || { echo " Home inference PC needs this secret:"; grep '^KIWION_INFERENCE_SECRET=' .env | sed 's/^/ /'; }
+echo "================================================================"
