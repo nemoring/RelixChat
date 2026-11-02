@@ -19,7 +19,7 @@ cp .env.example .env                    # KIWION_INFERENCE_SECRET, KIWION_THREAD
 sudo cp deploy/systemd/kiwion-inference.service /etc/systemd/system/ && sudo systemctl enable --now kiwion-inference
 ```
 
-Docker-вариант: `docker compose -f deploy/docker-compose.inference.yml up -d --build` (сборка llama.cpp
+Docker-вариант: `docker compose --env-file .env -f deploy/docker-compose.inference.yml up -d --build` (сборка llama.cpp
 внутри образа; собирайте образ на той же машине).
 
 ## 2. Канал VPS ↔ дом
@@ -54,7 +54,7 @@ sudo WITH_MODEL=1 bash deploy/install_vps.sh chat.example.com you@example.com <g
 запустит контейнер `inference` во внутренней сети Docker (наружу порт не открывается). Нужно
 ≥ 4 ГБ RAM и 2+ vCPU; WireGuard и `KIWION_INFERENCE_SECRET` на другом компьютере не нужны.
 Вручную: `KIWION_INFERENCE_URL=http://inference:8090` в `.env` и
-`docker compose -f deploy/docker-compose.vps.yml --profile model up -d --build`.
+`docker compose --env-file .env -f deploy/docker-compose.vps.yml --profile model up -d --build`.
 
 Вручную:
 
@@ -63,8 +63,8 @@ cp .env.example .env
 # KIWION_ENV=production, KIWION_SECRET_KEY=$(kiwion secret), KIWION_INFERENCE_SECRET=<как на узле>,
 # KIWION_PUBLIC_URL=https://chat.example.com, KIWION_DOMAIN=chat.example.com,
 # KIWION_INFERENCE_URL=http://10.8.0.2:8090, KIWION_MAIL_MODE=smtp + SMTP-параметры
-docker compose -f deploy/docker-compose.vps.yml up -d --build
-docker compose -f deploy/docker-compose.vps.yml exec backend python -m kiwion_backend create-admin --email you@example.com
+docker compose --env-file .env -f deploy/docker-compose.vps.yml up -d --build
+docker compose --env-file .env -f deploy/docker-compose.vps.yml exec backend python -m kiwion_backend create-admin --email you@example.com
 ```
 
 Caddy автоматически получает сертификат Let's Encrypt (HTTPS), не буферизует SSE (`flush_interval -1`).

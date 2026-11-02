@@ -12,7 +12,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="${OLMO_REPO:-allenai/OLMo-2-0425-1B-Instruct}"
 QUANT="${QUANT:-Q4_K_M}"
 LLAMA="$ROOT/third_party/llama.cpp"
-HF_DIR="$ROOT/models/hf/OLMo-2-0425-1B-Instruct"
+HF_DIR="${HF_DIR:-$ROOT/models/hf/OLMo-2-0425-1B-Instruct}"   # put already-downloaded weights here
 F16="$ROOT/models/olmo-2-1b-instruct-F16.gguf"
 OUT="$ROOT/models/olmo-2-1b-instruct-$QUANT.gguf"
 
@@ -25,14 +25,18 @@ if [ ! -d "$VENV" ]; then
   "$VENV/bin/pip" install -q -r "$LLAMA/requirements/requirements-convert_hf_to_gguf.txt" "huggingface_hub>=0.23"
 fi
 
-echo "[1/3] downloading original weights: $REPO"
-"$VENV/bin/python" - "$REPO" "$HF_DIR" <<'PY'
+if [ -f "$HF_DIR/config.json" ] && ls "$HF_DIR"/*.safetensors >/dev/null 2>&1 && [ -f "$HF_DIR/tokenizer.json" ]; then
+  echo "[1/3] using weights already present in $HF_DIR (no download)"
+else
+  echo "[1/3] downloading original weights: $REPO"
+  "$VENV/bin/python" - "$REPO" "$HF_DIR" <<'PY'
 import sys
 from huggingface_hub import snapshot_download
 snapshot_download(repo_id=sys.argv[1], local_dir=sys.argv[2],
                   allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model", "tokenizer*"])
 print("downloaded to", sys.argv[2])
 PY
+fi
 
 echo "[2/3] converting to GGUF (F16)"
 "$VENV/bin/python" "$LLAMA/convert_hf_to_gguf.py" "$HF_DIR" --outtype f16 --outfile "$F16"

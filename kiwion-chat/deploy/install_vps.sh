@@ -42,7 +42,9 @@ if [ ! -f .env ]; then
   set_env KIWION_ADMIN_EMAILS "$ADMIN"
   set_env KIWION_MAIL_MODE smtp
   chmod 600 .env
+  mkdir -p models/hf
   echo ">>> .env created. Fill in KIWION_SMTP_* (mail) in $DIR/kiwion-chat/.env, then re-run this script."
+  [ "${WITH_MODEL:-0}" = "1" ] && echo ">>> Already have the weights? Upload them now: a .gguf file to $DIR/kiwion-chat/models/ (set KIWION_MODEL_FILE in .env), or the original Hugging Face folder to $DIR/kiwion-chat/models/hf/OLMo-2-0425-1B-Instruct/"
   if [ "${WITH_MODEL:-0}" != "1" ]; then
     echo ">>> Copy KIWION_INFERENCE_SECRET to the home inference PC's .env:"
     grep '^KIWION_INFERENCE_SECRET=' .env
@@ -57,7 +59,11 @@ ufw --force enable >/dev/null
 PROFILE=()
 if [ "${WITH_MODEL:-0}" = "1" ]; then
   PROFILE=(--profile model)
-  if [ ! -f models/olmo-2-1b-instruct-Q4_K_M.gguf ]; then
+  MODEL_FILE="$(grep '^KIWION_MODEL_FILE=' .env | cut -d= -f2-)"
+  MODEL_FILE="${MODEL_FILE:-olmo-2-1b-instruct-Q4_K_M.gguf}"
+  if [ -f "models/$MODEL_FILE" ]; then
+    echo "using existing model models/$MODEL_FILE"
+  else
     apt-get install -y -q build-essential cmake python3-venv
     if ! swapon --show | grep -q .; then        # conversion is safer with some swap on 4 GB VPS
       fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
@@ -65,10 +71,11 @@ if [ "${WITH_MODEL:-0}" = "1" ]; then
     fi
     JOBS="$(nproc)" bash scripts/build_llamacpp.sh
     bash scripts/download_model.sh            # original OLMo 2 1B Instruct -> GGUF Q4_K_M
+                                              # (reuses weights uploaded to models/hf/OLMo-2-0425-1B-Instruct)
   fi
 fi
 
-docker compose -f deploy/docker-compose.vps.yml "${PROFILE[@]}" up -d --build
+docker compose --env-file .env -f deploy/docker-compose.vps.yml "${PROFILE[@]}" up -d --build
 for _ in $(seq 60); do
   curl -fsS "https://$DOMAIN/api/health" >/dev/null 2>&1 && break; sleep 3
 done
