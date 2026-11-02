@@ -44,6 +44,18 @@ sudo bash deploy/install_vps.sh chat.example.com you@example.com https://github.
 # первый запуск создаёт .env с секретами -> впишите SMTP -> запустите команду ещё раз
 ```
 
+### Модель на этом же VPS (без домашнего ПК)
+
+```bash
+sudo WITH_MODEL=1 bash deploy/install_vps.sh chat.example.com you@example.com <git-url> <branch>
+```
+
+Скрипт соберёт llama.cpp, скачает исходные веса OLMo 2 1B Instruct, сконвертирует их в GGUF Q4_K_M и
+запустит контейнер `inference` во внутренней сети Docker (наружу порт не открывается). Нужно
+≥ 4 ГБ RAM и 2+ vCPU; WireGuard и `KIWION_INFERENCE_SECRET` на другом компьютере не нужны.
+Вручную: `KIWION_INFERENCE_URL=http://inference:8090` в `.env` и
+`docker compose -f deploy/docker-compose.vps.yml --profile model up -d --build`.
+
 Вручную:
 
 ```bash
