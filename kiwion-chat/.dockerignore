@@ -1,0 +1,10 @@
+# keep the Docker build context small
+**/__pycache__
+.git
+data
+models
+mobile
+tests
+third_party/llama.cpp/build
+third_party/llama.cpp/.git
+node_modules

@@ -20,17 +20,33 @@ REPO="${3:?git url required}"
 BRANCH="${4:-main}"
 DIR=/opt/kiwion
 
+# network to GitHub/Docker Hub can be flaky from some regions: retry instead of failing at once
+retry() { local n=1; until "$@"; do [ $n -ge 6 ] && return 1; echo "retry $n/5: $*"; n=$((n+1)); sleep $((n*5)); done; }
+export GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=60
+git() { command git -c http.version=HTTP/1.1 "$@"; }
+
 apt-get update -q
 apt-get install -y -q ca-certificates curl git openssl ufw
-if ! command -v docker >/dev/null; then curl -fsSL https://get.docker.com | sh; fi
+if ! command -v docker >/dev/null; then
+  retry sh -c 'curl -fsSL https://get.docker.com | sh' || { apt-get install -y -q docker.io docker-compose-v2; }
+fi
+# Docker Hub is often unreachable from Russian data centres: fall back to Google's public mirror
+if ! curl -s -m 15 -o /dev/null https://registry-1.docker.io/v2/; then
+  echo "Docker Hub is not reachable — using the mirror.gcr.io registry mirror"
+  mkdir -p /etc/docker
+  [ -f /etc/docker/daemon.json ] || echo '{"registry-mirrors": ["https://mirror.gcr.io"]}' > /etc/docker/daemon.json
+  systemctl restart docker
+fi
 
 if [ -d "$DIR/.git" ]; then
-  git -C "$DIR" fetch -q origin "$BRANCH" && git -C "$DIR" checkout -q "$BRANCH" && git -C "$DIR" pull -q --ff-only origin "$BRANCH"
+  retry git -C "$DIR" fetch -q origin "$BRANCH"
+  git -C "$DIR" checkout -q -B "$BRANCH" "origin/$BRANCH"
 elif [ -d "$DIR" ]; then            # e.g. weights were uploaded to $DIR/kiwion-chat/models before the first run
   git -C "$DIR" init -q && git -C "$DIR" remote add origin "$REPO" 2>/dev/null || true
-  git -C "$DIR" fetch -q origin "$BRANCH" && git -C "$DIR" checkout -q -f -B "$BRANCH" "origin/$BRANCH"
+  retry git -C "$DIR" fetch -q origin "$BRANCH"
+  git -C "$DIR" checkout -q -f -B "$BRANCH" "origin/$BRANCH"
 else
-  git clone -q -b "$BRANCH" "$REPO" "$DIR"
+  retry git clone -q -b "$BRANCH" "$REPO" "$DIR"
 fi
 cd "$DIR/kiwion-chat"
 
@@ -74,13 +90,13 @@ if [ "${WITH_MODEL:-0}" = "1" ]; then
       fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
       grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
     fi
-    JOBS="$(nproc)" bash scripts/build_llamacpp.sh
-    bash scripts/download_model.sh            # original OLMo 2 1B Instruct -> GGUF Q4_K_M
+    JOBS="$(nproc)" retry bash scripts/build_llamacpp.sh
+    retry bash scripts/download_model.sh      # original OLMo 2 1B Instruct -> GGUF Q4_K_M
                                               # (reuses weights uploaded to models/hf/OLMo-2-0425-1B-Instruct)
   fi
 fi
 
-docker compose --env-file .env -f deploy/docker-compose.vps.yml "${PROFILE[@]}" up -d --build
+retry docker compose --env-file .env -f deploy/docker-compose.vps.yml "${PROFILE[@]}" up -d --build
 for _ in $(seq 60); do
   curl -fsS "https://$DOMAIN/api/health" >/dev/null 2>&1 && break; sleep 3
 done

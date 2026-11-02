@@ -19,8 +19,8 @@ cp .env.example .env                    # KIWION_INFERENCE_SECRET, KIWION_THREAD
 sudo cp deploy/systemd/kiwion-inference.service /etc/systemd/system/ && sudo systemctl enable --now kiwion-inference
 ```
 
-Docker-вариант: `docker compose --env-file .env -f deploy/docker-compose.inference.yml up -d --build` (сборка llama.cpp
-внутри образа; собирайте образ на той же машине).
+Docker-вариант: `scripts/build_llamacpp.sh`, затем `docker compose --env-file .env -f deploy/docker-compose.inference.yml up -d --build`
+(образ компилирует llama.cpp из `third_party/llama.cpp`; собирайте образ на той же машине).
 
 ## 2. Канал VPS ↔ дом
 
