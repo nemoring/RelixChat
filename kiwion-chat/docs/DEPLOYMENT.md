@@ -48,6 +48,25 @@ sudo bash deploy/install_vps.sh chat.example.com you@example.com https://github.
 `https://<домен>/admin/` → **Почта** → шаблон Gmail/Яндекс → логин и пароль приложения → «Проверить
 подключение» → «Отправить тестовое письмо». Проверка подскажет, если хостинг блокирует порты 465/587.
 
+### Установка без GitHub, Docker Hub и PyPI (офлайн-архив)
+
+Если VPS не может скачать код с GitHub (или образы с Docker Hub), используйте автономный архив:
+`scripts/make_offline_bundle.sh` собирает `kiwion-offline.tar.gz` (код, исходники llama.cpp,
+Python-пакеты для Ubuntu 24.04) и `kiwion-convert-tools.tar.gz` (PyTorch и др. — нужен только для
+конвертации исходных весов Hugging Face в GGUF). Остальное ставится из зеркала Ubuntu (Caddy, компиляторы).
+
+```bash
+# загрузите архивы (и веса: .gguf или zip папки Hugging Face) на Яндекс Диск, откройте доступ по ссылке
+curl -fsSG https://cloud-api.yandex.net/v1/disk/public/resources/download \
+  --data-urlencode "public_key=<ссылка на kiwion-offline.tar.gz>" | sed -n 's/.*"href":"\([^"]*\)".*/\1/p' > url.txt
+curl -fL -o kiwion-offline.tar.gz "$(cat url.txt)" && tar xzf kiwion-offline.tar.gz && cd kiwion-offline
+bash kiwion-chat/scripts/fetch_yadisk.sh "<ссылка на kiwion-convert-tools.tar.gz>" kiwion-convert-tools.tar.gz
+sudo KIWION_WEIGHTS_URL="<ссылка на веса>" WITH_MODEL=1 bash install.sh chat.example.com you@example.com
+```
+
+Установка без Docker: службы systemd `kiwion-backend` и `kiwion-inference`, Caddy с HTTPS, код в
+`/opt/kiwion-app`, данные в `/opt/kiwion-app/data`, логи — `journalctl -u kiwion-backend -f`.
+
 ### Модель на этом же VPS (без домашнего ПК)
 
 ```bash

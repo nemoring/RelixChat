@@ -20,7 +20,7 @@ cd "$DIR"
 git fetch --depth 1 origin "$REF" 2>/dev/null || git fetch origin
 git checkout -q "$REF" 2>/dev/null || echo "warning: could not checkout $REF, building current checkout"
 
-FLAGS=(-DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON)
+FLAGS=(-DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF)
 if [ "${KIWION_VULKAN:-0}" = "1" ]; then
   FLAGS+=(-DGGML_VULKAN=ON)   # needs libvulkan-dev + glslc (Ubuntu: sudo apt install libvulkan-dev glslc mesa-vulkan-drivers)
 fi
