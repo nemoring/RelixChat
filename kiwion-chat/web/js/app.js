@@ -2,6 +2,7 @@
 import { api, ApiError, auth, deviceId, solvePow, store, stream } from "./api.js";
 import { KiwiEasterEgg, mascotHTML, TapCounter } from "./kiwi.js";
 
+const AI_NOTE = "Kiwion — это ИИ, и он может ошибаться";
 const OVERLOADED = "Птичка киви немного устала 🥝. Сейчас слишком много запросов. Попробуйте отправить сообщение позже";
 const LOGO = "/assets/kiwi/logo.png";
 const root = document.getElementById("root");
@@ -463,7 +464,7 @@ function messageEl(m, isLast) {
     $(".bubble", el).textContent = m.content;
   } else {
     el.innerHTML = `<div class="kiwi-avatar">${mascotHTML()}</div><div class="bubble"><div class="content"></div>
-      <div class="status-note"></div>
+      <div class="status-note"></div><div class="ai-note">${AI_NOTE}</div>
       <div class="msg-tools"><button class="icon-btn" data-act="copy" title="Копировать ответ" aria-label="Копировать ответ">${I.copy}</button>
       ${isLast ? `<button class="icon-btn" data-act="regen" title="Сгенерировать заново" aria-label="Сгенерировать заново">${I.redo}</button>` : ""}
       <span class="msg-meta">${m.completion_tokens ? m.completion_tokens + " ток." : ""}</span></div></div>`;

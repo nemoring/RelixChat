@@ -27,6 +27,7 @@ import java.util.List;
 
 /** A single conversation with streaming answers, stop, regenerate, edit and copy. */
 public class ChatActivity extends BaseActivity {
+    static final String AI_NOTE = "Kiwion — это ИИ, и он может ошибаться";
     private String chatId;
     private final List<JSONObject> messages = new ArrayList<>();
     private LinearLayout list;
@@ -154,6 +155,9 @@ public class ChatActivity extends BaseActivity {
             String st = m.optString("status");
             if ("stopped".equals(st)) content.addView(Ui.text(this, "⏹ Генерация остановлена", 12, pal.muted, false));
             if ("error".equals(st)) content.addView(Ui.text(this, "⚠ Ответ не получен", 12, pal.danger, false));
+            TextView aiNote = Ui.text(this, AI_NOTE, 12, pal.muted, false);
+            aiNote.setPadding(0, Ui.dp(this, 6), 0, 0);
+            content.addView(aiNote);
             wrap.addView(content, new LinearLayout.LayoutParams(-1, -2));
             content.setOnLongClickListener(new View.OnLongClickListener() { public boolean onLongClick(View v) { copy(m.optString("content")); return true; } });
             LinearLayout actions = Ui.hbox(this);

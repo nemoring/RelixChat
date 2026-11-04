@@ -222,6 +222,7 @@ public class KiwionUiTest {
         waitFor(new Cond() { public boolean ok() { return "Отправить".contentEquals(send.getContentDescription())
                 && containing(c, "Kiwion (mock) получил") != null; } }, 30000);
         assertNotNull("streamed markdown answer contains the prompt", containing(c, "Привет из Android!"));
+        assertNotNull("AI disclaimer under the answer", byText(c, "Kiwion — это ИИ, и он может ошибаться"));
         assertNotNull("code block rendered with copy action", byText(c, "Копировать"));
         assertEquals("input cleared after send", "", input.getText().toString());
 

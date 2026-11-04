@@ -113,6 +113,8 @@ def test_main_user_journey(server):
         page.wait_for_selector("#send[aria-label='Отправить']", timeout=15000)
         shot(page, "04-answer")
         assert "Привет, киви!" in page.inner_text(".msg.assistant .md")
+        assert page.inner_text(".msg.assistant .ai-note") == "Kiwion — это ИИ, и он может ошибаться"
+        assert "может ошибаться" not in page.inner_text(".msg.assistant .md")   # not part of the answer text
         assert page.locator(".chat-item.active .title").inner_text() == "Привет, киви!"
 
         # stop generation keeps the partial answer
