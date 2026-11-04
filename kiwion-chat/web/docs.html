@@ -24,7 +24,7 @@
 <body>
 <div class="doc">
   <header><img src="/assets/kiwi/logo.png" width="56" height="56" alt=""><div><h1 style="margin:0">Kiwion Developer API</h1>
-    <p class="hint" style="margin:0">OpenAI-совместимый API модели OLMo 2 1B Instruct · <a href="/">Kiwion Chat</a> · <a href="/api/docs">OpenAPI</a></p></div></header>
+    <p class="hint" style="margin:0">OpenAI-совместимый API (модель: <span id="mname">…</span>) · <a href="/">Kiwion Chat</a> · <a href="/api/docs">OpenAPI</a></p></div></header>
 
   <h2>Быстрый старт</h2>
   <ol>
@@ -32,7 +32,7 @@
     <li>Откройте <b>Настройки → API-ключи</b> и создайте ключ. Полное значение (<code>kw-…</code>) показывается <b>только один раз</b> — сервер хранит лишь его хеш.</li>
     <li>Передавайте ключ в заголовке <code>Authorization: Bearer kw-…</code>.</li>
   </ol>
-  <p>Базовый URL: <code id="base">https://your-domain</code><code>/v1</code>. Модель: <code>olmo-2-1b-instruct</code>.</p>
+  <p>Базовый URL: <code id="base">https://your-domain</code><code>/v1</code>. Модель: <code class="mid">kiwion</code> (или <code>kiwion</code> — всегда текущая модель сервера).</p>
 
   <h2>Эндпоинты</h2>
   <table>
@@ -44,7 +44,7 @@
   <h3>Параметры <code>/v1/chat/completions</code></h3>
   <table>
     <tr><th>Поле</th><th>Тип</th><th>Описание</th></tr>
-    <tr><td><code>model</code></td><td>string</td><td><code>olmo-2-1b-instruct</code> (также принимаются <code>kiwion</code>, <code>kiwion-chat</code>)</td></tr>
+    <tr><td><code>model</code></td><td>string</td><td><code class="mid">kiwion</code> (также принимаются <code>kiwion</code>, <code>kiwion-chat</code>)</td></tr>
     <tr><td><code>messages</code></td><td>array</td><td>Роли <code>system</code>, <code>developer</code>, <code>user</code>, <code>assistant</code>; до 200 сообщений</td></tr>
     <tr><td><code>max_tokens</code> / <code>max_completion_tokens</code></td><td>int</td><td>До 1024 токенов ответа (по умолчанию 512)</td></tr>
     <tr><td><code>temperature</code></td><td>float</td><td>0–2, по умолчанию 0.7</td></tr>
@@ -61,7 +61,7 @@
   -H "Authorization: Bearer $KIWION_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "olmo-2-1b-instruct",
+    "model": "kiwion",
     "messages": [{"role": "user", "content": "Расскажи про птицу киви"}],
     "max_tokens": 200
   }'
@@ -69,7 +69,7 @@
 # потоковый ответ
 curl -N https://your-domain/v1/chat/completions \
   -H "Authorization: Bearer $KIWION_API_KEY" -H "Content-Type: application/json" \
-  -d '{"model":"olmo-2-1b-instruct","stream":true,"messages":[{"role":"user","content":"Привет!"}]}'</code></pre>
+  -d '{"model":"kiwion","stream":true,"messages":[{"role":"user","content":"Привет!"}]}'</code></pre>
 
   <h3>Python (официальный SDK openai)</h3>
 <pre><code class="language-python">from openai import OpenAI
@@ -78,14 +78,14 @@ client = OpenAI(base_url="https://your-domain/v1", api_key="kw-...")
 
 # обычный ответ
 r = client.chat.completions.create(
-    model="olmo-2-1b-instruct",
+    model="kiwion",
     messages=[{"role": "user", "content": "Напиши хайку про киви"}],
 )
 print(r.choices[0].message.content, r.usage)
 
 # потоковый ответ
 stream = client.chat.completions.create(
-    model="olmo-2-1b-instruct",
+    model="kiwion",
     messages=[{"role": "user", "content": "Объясни рекурсию"}],
     stream=True,
 )
@@ -98,7 +98,7 @@ for chunk in stream:
 
 with httpx.stream("POST", "https://your-domain/v1/chat/completions",
                   headers={"Authorization": "Bearer kw-..."},
-                  json={"model": "olmo-2-1b-instruct", "stream": True,
+                  json={"model": "kiwion", "stream": True,
                         "messages": [{"role": "user", "content": "Привет"}]},
                   timeout=300) as r:
     for line in r.iter_lines():
@@ -111,7 +111,7 @@ with httpx.stream("POST", "https://your-domain/v1/chat/completions",
   method: "POST",
   headers: { "Authorization": `Bearer ${process.env.KIWION_API_KEY}`, "Content-Type": "application/json" },
   body: JSON.stringify({
-    model: "olmo-2-1b-instruct",
+    model: "kiwion",
     stream: true,
     messages: [{ role: "user", content: "Как дела, киви?" }],
   }),
@@ -136,7 +136,7 @@ for (;;) {
 <pre><code class="language-javascript">import OpenAI from "openai";
 const client = new OpenAI({ baseURL: "https://your-domain/v1", apiKey: process.env.KIWION_API_KEY });
 const r = await client.chat.completions.create({
-  model: "olmo-2-1b-instruct",
+  model: "kiwion",
   messages: [{ role: "user", content: "Привет!" }],
 });
 console.log(r.choices[0].message.content);</code></pre>

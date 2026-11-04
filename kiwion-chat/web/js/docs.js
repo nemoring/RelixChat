@@ -9,4 +9,8 @@
     el.textContent = el.textContent.split("https://your-domain").join(origin);
     if (window.hljs) window.hljs.highlightElement(el);
   });
+  fetch("/api/config/public").then(function (r) { return r.json(); }).then(function (c) {
+    document.getElementById("mname").textContent = c.model;
+    document.querySelectorAll(".mid").forEach(function (el) { el.textContent = c.model_id; });
+  }).catch(function () {});
 })();

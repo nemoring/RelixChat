@@ -28,7 +28,7 @@ import httpx
 
 from kiwion_shared.messages import OVERLOADED_RU
 from kiwion_shared.signing import sign_request
-from kiwion_shared.version import MODEL_DISPLAY_NAME, __version__
+from kiwion_shared.version import __version__
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 HOME = Path(os.getenv("KIWION_HOME", Path.home() / ".kiwion"))
@@ -39,7 +39,7 @@ if not sys.stdout.isatty() or os.getenv("NO_COLOR"):
 KIWI = rf"""{GREEN}
      ,~~.
     (  6 )-_,     {BOLD}Kiwion Chat{RESET}{GREEN}  v{__version__}
- (\___ )=='-'     {RESET}{DIM}by Kiwi_Fuzzy · {MODEL_DISPLAY_NAME}{RESET}{GREEN}
+ (\___ )=='-'     {RESET}{DIM}by Kiwi_Fuzzy{RESET}{GREEN}
   \ .   ) )
    \ `-' /
     `~j-'
@@ -115,7 +115,7 @@ class ApiTarget:
         return r.json()["data"]
 
     def stream(self, messages, max_tokens=512, temperature=0.7):
-        body = {"model": "olmo-2-1b-instruct", "messages": messages, "max_tokens": max_tokens,
+        body = {"model": "kiwion", "messages": messages, "max_tokens": max_tokens,
                 "temperature": temperature, "stream": True, "stream_options": {"include_usage": True}}
         t0 = time.monotonic()
         with self.http.stream("POST", "/v1/chat/completions", json=body) as r:

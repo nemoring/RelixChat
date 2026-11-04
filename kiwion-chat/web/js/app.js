@@ -375,7 +375,7 @@ function renderModelPill() {
   let cls = "bad", text = "Модель офлайн";
   if (m.state === "online") {
     cls = m.busy ? "warn" : "ok";
-    text = m.queue_waiting ? `Очередь: ${m.queue_waiting}` : "OLMo 2 1B · онлайн";
+    text = m.queue_waiting ? `Очередь: ${m.queue_waiting}` : `${m.model || "Модель"} · онлайн`;
     if (m.engine === "mock") text += " (тест)";
   } else if (m.state === "loading") { cls = "warn"; text = "Модель загружается…"; }
   el.className = `pill ${cls}`;
@@ -441,7 +441,7 @@ function renderMessages() {
   if (!box) return;
   if (!S.messages.length) {
     box.innerHTML = `<div class="empty">${mascotHTML("mascot")}<h2>Привет! Я киви 🥝</h2>
-      <p>Спросите что-нибудь — я отвечу с помощью модели OLMo 2.</p>
+      <p>Спросите что-нибудь — я отвечу с помощью модели ${esc(S.config?.model || "")}.</p>
       <div class="suggestions">${SUGGESTIONS.map((s) => `<button class="suggestion" type="button">${esc(s)}</button>`).join("")}</div></div>`;
     $$(".suggestion", box).forEach((b) => b.addEventListener("click", () => { $("#input").value = b.textContent; send(); }));
     return;
@@ -812,9 +812,9 @@ function tabAbout(el) {
     <h2 style="margin:8px 0 2px">Kiwion Chat</h2><p class="hint">Разработчик: ${esc(c.developer || "Kiwi_Fuzzy")}</p></div>
     <div class="card section">
       <div class="row-item version-row" id="version-row" role="button" tabindex="0" aria-label="Версия приложения"><div class="grow">Версия приложения</div><b>${esc(c.version || "1.0.0")}</b></div>
-      <div class="row-item"><div class="grow">Модель</div><b>${esc(c.model || "OLMo 2 1B Instruct")}</b></div>
+      <div class="row-item"><div class="grow">Модель</div><b>${esc(c.model || "—")}</b></div>
       <div class="row-item"><div class="grow">Инференс</div><b>llama.cpp (собственный сервер)</b></div>
-      <div class="row-item"><div class="grow">Лицензия модели</div><b>Apache 2.0 · Ai2</b></div>
+      <div class="row-item"><div class="grow">Лицензия модели</div><b>${esc(c.model_license || "—")}</b></div>
       <div class="row-item"><div class="grow">Документация API</div><a href="/docs" target="_blank">Открыть</a></div></div>`;
   const row = $("#version-row");
   const hit = () => { if (taps.tap()) egg.open(); };

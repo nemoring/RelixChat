@@ -405,7 +405,14 @@ public class SettingsActivity extends BaseActivity {
                 }
             }
         });
-        row(card, "Модель", "OLMo 2 1B Instruct (Ai2, Apache 2.0)", null);
+        final TextView model = row(card, "Модель", "…", null);
+        bg(new Task<JSONObject>() { public JSONObject run() throws ApiException { return app.api.get("/api/config/public"); } },
+                new Done<JSONObject>() {
+                    public void done(JSONObject c) {
+                        String lic = c.optString("model_license", "");
+                        model.setText(c.optString("model", "—") + (lic.isEmpty() ? "" : " (" + lic + ")"));
+                    }
+                }, new Fail() { public void fail(ApiException e) { model.setText("нет связи с сервером"); } });
         row(card, "Инференс", "llama.cpp на собственном сервере Kiwion", null);
         row(card, "Сервер", app.prefs.server(), null);
         row(card, "Документация API", app.prefs.server() + "/docs", null);

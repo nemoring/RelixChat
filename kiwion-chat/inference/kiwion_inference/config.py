@@ -55,7 +55,13 @@ class InferenceConfig:
     llama_server_bin: str = field(default_factory=_find_llama_server)
     model_path: str = field(default_factory=lambda: os.getenv(
         "KIWION_MODEL_PATH", str(PROJECT_ROOT / "models/olmo-2-1b-instruct-Q4_K_M.gguf")))
-    model_id: str = field(default_factory=lambda: os.getenv("KIWION_MODEL_ID", "olmo-2-1b-instruct"))
+    # display name / API id; empty = derived from the GGUF file name (kiwion_shared.models)
+    model_name: str = field(default_factory=lambda: os.getenv("KIWION_MODEL_NAME", ""))
+    model_id: str = field(default_factory=lambda: os.getenv("KIWION_MODEL_ID", ""))
+    # how chats are turned into a prompt: auto | olmo2 | model
+    #   olmo2 = Kiwion's exact OLMo 2 template, model = the chat template stored in the GGUF
+    #   auto  = olmo2 for OLMo files, the model's own template for everything else
+    prompt_format: str = field(default_factory=lambda: os.getenv("KIWION_PROMPT_FORMAT", "auto"))
     llama_port: int = field(default_factory=lambda: int(os.getenv("KIWION_LLAMA_PORT", "8091")))
     threads: int = field(default_factory=lambda: int(os.getenv("KIWION_THREADS", "0")) or _physical_cores())
     ctx_size: int = field(default_factory=lambda: int(os.getenv("KIWION_CTX", "2048")))
@@ -81,5 +87,15 @@ class InferenceConfig:
                 "or set KIWION_INFERENCE_INSECURE_DEV=1 for local development only.")
         if self.secret and len(self.secret) < 32:
             raise SystemExit("KIWION_INFERENCE_SECRET must be at least 32 characters long")
+        if self.prompt_format not in ("auto", "olmo2", "model"):
+            raise SystemExit("KIWION_PROMPT_FORMAT must be auto, olmo2 or model")
         if self.parallel < 1 or self.max_queue < 0:
             raise SystemExit("KIWION_PARALLEL must be >= 1 and KIWION_MAX_QUEUE >= 0")
+
+    def identity(self) -> dict:
+        from kiwion_shared.models import identify
+        return identify(self.model_path, self.model_name, self.model_id)
+
+    def uses_olmo_template(self) -> bool:
+        from kiwion_shared.models import is_olmo
+        return self.prompt_format == "olmo2" or (self.prompt_format == "auto" and is_olmo(self.model_path))

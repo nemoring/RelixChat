@@ -22,9 +22,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from kiwion_shared.prompt import render_olmo2, trim_history, with_default_system
+from kiwion_shared.prompt import trim_history, with_default_system
 from kiwion_shared.signing import NonceCache, verify_request
-from kiwion_shared.version import __version__, MODEL_DISPLAY_NAME
+from kiwion_shared.version import __version__
 
 from .config import InferenceConfig
 from .engine import BaseEngine, EngineUnavailable, make_engine
@@ -89,11 +89,12 @@ def create_app(cfg: InferenceConfig | None = None, engine: BaseEngine | None = N
 
     @app.get("/v1/status")
     async def status():
-        return {"version": __version__, "model_name": MODEL_DISPLAY_NAME, **engine.info(), "queue": queue.stats()}
+        return {"version": __version__, **engine.info(), "queue": queue.stats()}
 
     @app.get("/v1/models")
     async def models():
-        return {"data": [{"id": cfg.model_id, "name": MODEL_DISPLAY_NAME, "context_length": cfg.ctx_size,
+        ident = cfg.identity()
+        return {"data": [{"id": ident["id"], "name": ident["name"], "context_length": cfg.ctx_size,
                           "engine": engine.name, "state": engine.state}]}
 
     @app.post("/v1/generate")
@@ -112,7 +113,11 @@ def create_app(cfg: InferenceConfig | None = None, engine: BaseEngine | None = N
                 else with_default_system(messages)
         max_tokens = min(req.max_tokens, cfg.max_tokens_cap)
         messages = trim_history(messages, max(256, cfg.ctx_size - max_tokens - 16))
-        prompt = render_olmo2(messages)
+        try:
+            prompt = await engine.render(messages)
+        except EngineUnavailable as e:
+            await queue.cancel(ticket)
+            return JSONResponse({"error": "model_unavailable", "message": str(e)}, status_code=503)
 
         async def stream():
             events: asyncio.Queue = asyncio.Queue()

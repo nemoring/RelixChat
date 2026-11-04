@@ -59,6 +59,13 @@ class InferenceClient:
         self._status_cache = (now, data)
         return data
 
+    async def model_identity(self) -> dict:
+        """Name / API id / licence of the model the inference node is serving (cached via status())."""
+        from kiwion_shared.version import MODEL_DISPLAY_NAME, MODEL_ID
+        s = await self.status()
+        return {"name": s.get("model_name") or MODEL_DISPLAY_NAME, "id": s.get("model") or MODEL_ID,
+                "license": s.get("model_license") or ""}
+
     async def generate(self, messages: list[dict], max_tokens: int, temperature: float = 0.7,
                        top_p: float = 0.9, stop: list[str] | None = None, seed: int | None = None,
                        system_prompt: str | None = None) -> AsyncIterator[dict]:

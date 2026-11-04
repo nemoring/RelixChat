@@ -108,13 +108,16 @@ public class KiwionUiTest {
         KiwiView bird = null;
         for (View v : all(a)) if (v instanceof KiwiView && byDescription(a, "Fluffy Kiwi") != null && v.getParent() == byDescription(a, "Fluffy Kiwi")) bird = (KiwiView) v;
         assertNotNull(bird);
-        boolean clicked = pet.performClick();
-        idle();
-        assertTrue("pet click handled", clicked);
-        assertTrue("kiwi closes its eyes when petted (bird=" + System.identityHashCode(bird) + ")", bird.isEyesClosed());
-        assertTrue("'Kiwi is happy!' is shown", containing(a, "Kiwi is happy!").getAlpha() > 0.9f
-                || containing(a, "Kiwi is happy!").animate() != null);
+        assertTrue("pet click handled", pet.performClick());
+        // check right after the tap: Robolectric's idle() plays the 2.4 s animation to the end,
+        // after which the kiwi opens its eyes again by design
+        assertTrue("kiwi closes its eyes when petted", bird.isEyesClosed());
+        TextView happy = containing(a, "Kiwi is happy!");
+        assertNotNull("'Kiwi is happy!' label exists", happy);
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3));
+        assertTrue("'Kiwi is happy!' is visible", happy.getAlpha() > 0.9f);
+        // the kiwi keeps blinking (120 ms every 2.6 s): wait up to 1 s for the eyes to be open
+        for (int i = 0; i < 20 && bird.isEyesClosed(); i++) shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(50));
         assertFalse("eyes open again", bird.isEyesClosed());
 
         // close via the × button; UI below is usable again

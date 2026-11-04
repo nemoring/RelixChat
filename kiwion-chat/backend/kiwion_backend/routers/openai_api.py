@@ -19,7 +19,16 @@ from ..inference_client import InferenceOverloaded, InferenceUnavailable
 from ..usage import api_key_limits, tokens_used_today
 
 router = APIRouter(prefix="/v1", tags=["openai-compatible"])
-MODEL_ALIASES = {MODEL_ID, "kiwion", "kiwion-chat", "olmo-2-0425-1b-instruct", "olmo2-1b-instruct"}
+# "kiwion" always means "the model this server runs"; the served model's own id is accepted too
+GENERIC_ALIASES = {"kiwion", "kiwion-chat", "default"}
+OLMO_ALIASES = {MODEL_ID, "olmo-2-0425-1b-instruct", "olmo2-1b-instruct"}
+
+
+def accepted_models(model_id: str) -> set[str]:
+    out = GENERIC_ALIASES | {model_id}
+    if model_id.startswith("olmo"):
+        out |= OLMO_ALIASES
+    return out
 
 
 def oai_error(status: int, message: str, type_: str, code: str) -> JSONResponse:
@@ -37,7 +46,7 @@ class StreamOptions(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
-    model: str = MODEL_ID
+    model: str = "kiwion"
     messages: list[ChatMessage] = Field(min_length=1, max_length=200)
     max_tokens: int | None = Field(default=None, ge=1, le=4096)
     max_completion_tokens: int | None = Field(default=None, ge=1, le=4096)
@@ -62,9 +71,10 @@ def _text(content) -> str:
 
 
 @router.get("/models")
-def models(key: ApiKey = Depends(api_key_auth)):
-    return {"object": "list", "data": [{"id": MODEL_ID, "object": "model", "created": 1714521600,
-                                        "owned_by": "kiwion (OLMo 2 by Ai2)"}]}
+async def models(request: Request, key: ApiKey = Depends(api_key_auth)):
+    m = await state(request).inference.model_identity()
+    return {"object": "list", "data": [{"id": m["id"], "object": "model", "created": 1714521600,
+                                        "owned_by": "kiwion", "name": m["name"]}]}
 
 
 @router.post("/chat/completions")
@@ -74,8 +84,9 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
     cfg = st.store.all()
     if cfg["maintenance_mode"] or not cfg["api_enabled"]:
         return oai_error(503, "Kiwion API is temporarily unavailable", "server_error", "service_unavailable")
-    if body.model not in MODEL_ALIASES:
-        return oai_error(404, f"The model '{body.model}' does not exist. Use '{MODEL_ID}'.",
+    served = (await st.inference.model_identity())["id"]
+    if body.model not in accepted_models(served):
+        return oai_error(404, f"The model '{body.model}' does not exist. Use '{served}' or 'kiwion'.",
                          "invalid_request_error", "model_not_found")
     rpm, daily = api_key_limits(key, cfg)
     ok, retry = st.limiter.hit(f"apikey:{key.id}", rpm, 60)
@@ -143,7 +154,7 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
             _record(st, user_id, key_id, usage["prompt_tokens"], usage["completion_tokens"],
                     int((time.monotonic() - started) * 1000), status)
         return {
-            "id": cid, "object": "chat.completion", "created": created, "model": MODEL_ID,
+            "id": cid, "object": "chat.completion", "created": created, "model": served,
             "choices": [{"index": 0, "message": {"role": "assistant", "content": "".join(text)},
                          "finish_reason": finish, "logprobs": None}],
             "usage": {**usage, "total_tokens": usage["prompt_tokens"] + usage["completion_tokens"]},
@@ -153,7 +164,7 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
     include_usage = bool(body.stream_options and body.stream_options.include_usage)
 
     def chunk(delta: dict, finish=None, usage=None) -> str:
-        obj = {"id": cid, "object": "chat.completion.chunk", "created": created, "model": MODEL_ID,
+        obj = {"id": cid, "object": "chat.completion.chunk", "created": created, "model": served,
                "system_fingerprint": "kiwion-llamacpp",
                "choices": [{"index": 0, "delta": delta, "finish_reason": finish, "logprobs": None}]}
         if usage is not None:

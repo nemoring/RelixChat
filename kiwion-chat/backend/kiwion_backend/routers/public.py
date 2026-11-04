@@ -10,11 +10,13 @@ router = APIRouter(prefix="/api", tags=["public"])
 
 
 @router.get("/config/public")
-def public_config(request: Request):
+async def public_config(request: Request):
     st = state(request)
     cfg = st.store.all()
+    model = await st.inference.model_identity()
     return {"product": PRODUCT_NAME, "developer": DEVELOPER, "version": __version__,
-            "model": MODEL_DISPLAY_NAME, "launch_at": st.settings.launch_at,
+            "model": model["name"], "model_id": model["id"], "model_license": model["license"],
+            "launch_at": st.settings.launch_at,
             "registration_open": cfg["registration_open"] and not cfg["maintenance_mode"],
             "maintenance": cfg["maintenance_mode"], "maintenance_message": cfg["maintenance_message"],
             "referral_enabled": cfg["referral_enabled"], "pow_difficulty": st.pow.difficulty,

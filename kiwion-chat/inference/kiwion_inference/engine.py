@@ -23,7 +23,7 @@ from typing import AsyncIterator
 
 import httpx
 
-from kiwion_shared.prompt import BOS, STOP_SEQUENCES
+from kiwion_shared.prompt import BOS, STOP_SEQUENCES, render_olmo2
 
 from .config import InferenceConfig
 
@@ -51,11 +51,15 @@ class BaseEngine:
     async def stop(self) -> None: ...
 
     def info(self) -> dict:
+        ident = self.cfg.identity()
         return {
             "engine": self.name,
             "state": self.state,
             "error": self.error,
-            "model": self.cfg.model_id,
+            "model": ident["id"],
+            "model_name": ident["name"],
+            "model_license": ident["license"],
+            "prompt_format": self.prompt_mode(),
             "model_file": Path(self.cfg.model_path).name if self.name != "mock" else None,
             "ctx_size": self.cfg.ctx_size,
             "threads": self.cfg.threads,
@@ -65,6 +69,13 @@ class BaseEngine:
             "total_completion_tokens": self.total_completion_tokens,
             "last_tokens_per_second": self.last_tokens_per_second,
         }
+
+    def prompt_mode(self) -> str:
+        return "olmo2" if self.cfg.uses_olmo_template() else "model"
+
+    async def render(self, messages: list[dict]) -> str:
+        """Turn chat messages into the prompt string for /completion."""
+        return render_olmo2(messages)
 
     def generate(self, prompt: str, max_tokens: int, temperature: float, top_p: float,
                  stop: list[str], seed: int | None = None) -> AsyncIterator[dict]:
@@ -80,6 +91,8 @@ class LlamaCppEngine(BaseEngine):
         self.base_url = f"http://127.0.0.1:{cfg.llama_port}"
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(connect=5, read=600, write=30, pool=30))
         self.adds_bos = False
+        self.bos_token = BOS
+        self.has_template = False
         self._log_file = None
         self._watch_task: asyncio.Task | None = None
 
@@ -146,7 +159,8 @@ class LlamaCppEngine(BaseEngine):
                     await self._detect_bos()
                     self.state = "ready"
                     self.error = None
-                    log.info("llama-server ready (adds_bos=%s)", self.adds_bos)
+                    log.info("llama-server ready: %s, prompt=%s, adds_bos=%s",
+                             self.cfg.identity()["name"], self.prompt_mode(), self.adds_bos)
                     asyncio.create_task(self._supervise())
                     return
             except httpx.HTTPError:
@@ -175,6 +189,23 @@ class LlamaCppEngine(BaseEngine):
             self.adds_bos = bool(r.json().get("tokens"))
         except Exception:  # pragma: no cover - defensive
             self.adds_bos = False
+        try:
+            props = (await self.client.get(self.base_url + "/props", timeout=10)).json()
+            self.bos_token = props.get("bos_token") or BOS
+            self.has_template = bool(props.get("chat_template"))
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+    async def render(self, messages: list[dict]) -> str:
+        if self.prompt_mode() == "olmo2":
+            return render_olmo2(messages)
+        # the chat template stored in the GGUF (Gemma, Qwen, Llama, ...), applied by llama.cpp
+        try:
+            r = await self.client.post(self.base_url + "/apply-template", json={"messages": messages}, timeout=30)
+            r.raise_for_status()
+            return r.json()["prompt"]
+        except (httpx.HTTPError, KeyError, ValueError) as e:
+            raise EngineUnavailable(f"chat template failed: {e}") from e
 
     async def stop(self) -> None:
         self.state = "stopped"
@@ -196,14 +227,15 @@ class LlamaCppEngine(BaseEngine):
                        stop: list[str], seed: int | None = None) -> AsyncIterator[dict]:
         if self.state != "ready":
             raise EngineUnavailable(self.error or f"engine is {self.state}")
-        if self.adds_bos and prompt.startswith(BOS):
-            prompt = prompt[len(BOS):]
+        bos = self.bos_token or BOS
+        if self.adds_bos and bos and prompt.startswith(bos):
+            prompt = prompt[len(bos):]   # llama.cpp adds BOS itself; avoid a double BOS
         payload = {
             "prompt": prompt,
             "n_predict": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
-            "stop": list(dict.fromkeys(STOP_SEQUENCES + (stop or []))),
+            "stop": list(dict.fromkeys((STOP_SEQUENCES if self.prompt_mode() == "olmo2" else []) + (stop or []))),
             "stream": True,
             "cache_prompt": True,
             "repeat_penalty": 1.1,

@@ -26,7 +26,17 @@ def bytes_to_unicode():
     return dict(zip(bs, [chr(c) for c in cs]))
 
 
-def main(path: str) -> None:
+GEMMA3_TEMPLATE = (
+    "{{ bos_token }}{%- if messages[0]['role'] == 'system' -%}"
+    "{%- set first_user_prefix = messages[0]['content'] + '\n\n' -%}{%- set loop_messages = messages[1:] -%}"
+    "{%- else -%}{%- set first_user_prefix = '' -%}{%- set loop_messages = messages -%}{%- endif -%}"
+    "{%- for message in loop_messages -%}{%- set role = 'model' if message['role'] == 'assistant' else message['role'] -%}"
+    "{{ '<start_of_turn>' + role + '\n' + (first_user_prefix if loop.first else '') }}{{ message['content'] | trim }}"
+    "{{ '<end_of_turn>\n' }}{%- endfor -%}{%- if add_generation_prompt -%}{{ '<start_of_turn>model\n' }}{%- endif -%}"
+)
+
+
+def main(path: str, chat_template: str | None = None) -> None:
     rng = np.random.default_rng(42)
     n_embd, n_layer, n_head, n_ff, ctx = 64, 2, 4, 128, 4096
     b2u = bytes_to_unicode()
@@ -57,6 +67,8 @@ def main(path: str) -> None:
     w.add_eos_token_id(eos_id)
     w.add_pad_token_id(eos_id + 1)
     w.add_add_bos_token(False)
+    if chat_template:
+        w.add_chat_template(chat_template)
 
     def t(name, *shape, ones=False):
         arr = np.ones(shape, dtype=np.float32) if ones else (rng.standard_normal(shape) * 0.05).astype(np.float32)
@@ -83,4 +95,7 @@ def main(path: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "models/tiny-olmo2-test.gguf")
+    # --gemma-template embeds a Gemma 3 style chat template (tests the "model template" path)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    main(args[0] if args else "models/tiny-olmo2-test.gguf",
+         GEMMA3_TEMPLATE if "--gemma-template" in sys.argv else None)
