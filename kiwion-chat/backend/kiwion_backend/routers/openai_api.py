@@ -109,7 +109,7 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
     db.commit()
 
     agen = st.inference.generate(messages, max_tokens=max_tokens, temperature=body.temperature, top_p=body.top_p,
-                                 stop=stop[:4], seed=body.seed, system_prompt=None if not has_system else "")
+                                 stop=stop[:4], seed=body.seed, system_prompt=None if has_system else cfg["system_prompt"])
     started = time.monotonic()
     try:
         first = await agen.__anext__()

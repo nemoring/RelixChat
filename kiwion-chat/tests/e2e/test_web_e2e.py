@@ -269,6 +269,7 @@ def test_admin_panel(server):
         page.goto(f"{base}/admin/#/settings")
         page.wait_for_selector("[name=registration_open]")
         assert page.locator("[name=smtp_host]").count() == 0     # mail settings live on their own page
+        assert "LANGUAGE RULES" in page.input_value("[name=system_prompt]")      # editable system prompt
         page.uncheck("[name=registration_open]")
         page.click("#sf button[type=submit]")
         page.wait_for_selector(".toast >> text=Настройки сохранены")

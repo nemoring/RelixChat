@@ -177,6 +177,7 @@ const SETTING_LABELS = {
   referral_enabled: "Реферальная программа включена", referral_referrer_bonus_tokens: "Бонус пригласившему (токены)",
   referral_invitee_bonus_tokens: "Бонус приглашённому (токены)", referral_discount_percent: "Скидка за приглашение, %",
   referral_discount_cap: "Максимальная скидка, %", referral_max_confirmed_per_day: "Макс. подтверждений в сутки на пользователя",
+  system_prompt: "Системный промпт (инструкции модели перед каждым диалогом)",
   referral_review_threshold: "Порог риска: ручная проверка", referral_reject_threshold: "Порог риска: отклонение",
   max_accounts_per_device: "Макс. аккаунтов с одного устройства", signups_per_ip_per_hour: "Регистраций с IP в час",
 };
@@ -186,9 +187,14 @@ async function settings(main) {
   const MAIL = ["mail_mode", "smtp_host", "smtp_port", "smtp_security", "smtp_user", "mail_from"];
   const s = Object.fromEntries(Object.entries(all).filter(([k]) => !MAIL.includes(k)));
   const bools = Object.keys(s).filter((k) => typeof s[k] === "boolean");
-  const others = Object.keys(s).filter((k) => typeof s[k] !== "boolean");
+  const others = Object.keys(s).filter((k) => typeof s[k] !== "boolean" && k !== "system_prompt");
   main.innerHTML = `<h1>Лимиты и доступность</h1><form class="card" id="sf">
     <h3 style="margin-top:0">Доступность сервиса</h3>${bools.map((k) => `<label class="switch"><input type="checkbox" name="${k}" ${s[k] ? "checked" : ""}> ${esc(SETTING_LABELS[k] || k)}</label>`).join("")}
+    <h3>Системный промпт</h3>
+    <p class="hint">Инструкции, которые модель получает перед каждым диалогом: роль, тон, правила языка. Пустое поле — вернуть стандартный.</p>
+    <textarea class="input" name="system_prompt" rows="12" maxlength="8000" style="font-family:var(--mono);font-size:13px">${esc(s.system_prompt)}</textarea>
+    <div class="toolbar" style="margin-top:6px"><button type="button" class="btn ghost small" id="sp-reset">Вернуть стандартный</button>
+      <span class="hint" id="sp-count"></span></div>
     <h3>Параметры</h3><div class="settings-form">${others.map((k) => `<div class="field"><label>${esc(SETTING_LABELS[k] || k)}</label>
       <input class="input" name="${k}" type="${typeof s[k] === "number" ? "number" : "text"}" min="0" value="${esc(s[k])}"></div>`).join("")}</div>
     <button class="btn" type="submit">Сохранить</button></form>`;
@@ -197,8 +203,13 @@ async function settings(main) {
     const body = {};
     bools.forEach((k) => (body[k] = $(`[name=${k}]`).checked));
     others.forEach((k) => (body[k] = typeof s[k] === "number" ? parseInt($(`[name=${k}]`).value, 10) : $(`[name=${k}]`).value));
-    try { await api("/api/admin/settings", { method: "PUT", body }); toast("Настройки сохранены"); } catch (err) { toast(err.message, true); }
+    body.system_prompt = $("[name=system_prompt]").value;
+    try { await api("/api/admin/settings", { method: "PUT", body }); toast("Настройки сохранены"); settings(main); } catch (err) { toast(err.message, true); }
   });
+  const sp = $("[name=system_prompt]");
+  const count = () => ($("#sp-count").textContent = `${sp.value.length} / 8000`);
+  sp.addEventListener("input", count); count();
+  $("#sp-reset").addEventListener("click", () => { sp.value = ""; count(); toast("Сохраните, чтобы вернуть стандартный промпт"); });
 }
 
 async function errors(main) {

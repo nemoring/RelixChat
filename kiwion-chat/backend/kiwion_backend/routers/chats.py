@@ -141,7 +141,8 @@ def _preflight(st: AppState, db: DBSession, user: User, content_len: int = 0):
 async def _open_stream(st: AppState, history: list[dict], cfg: dict, temperature: float | None, chat_id: str):
     st.active_streams.pop(("stop", chat_id), None)   # forget stale stop requests from a previous answer
     agen = st.inference.generate(history, max_tokens=cfg["max_tokens_per_reply"],
-                                 temperature=0.7 if temperature is None else temperature)
+                                 temperature=0.7 if temperature is None else temperature,
+                                 system_prompt=cfg["system_prompt"])
     try:
         first = await agen.__anext__()
     except InferenceOverloaded:

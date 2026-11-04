@@ -5,6 +5,8 @@ import json
 import threading
 import time
 
+from kiwion_shared.prompt import DEFAULT_SYSTEM_PROMPT
+
 from .db import Setting
 
 DEFAULTS: dict = {
@@ -16,6 +18,8 @@ DEFAULTS: dict = {
     "free_daily_tokens": 30000,
     "max_tokens_per_reply": 512,
     "max_message_chars": 8000,
+    # instructions sent to the model before every chat (admin → «Лимиты и доступность»)
+    "system_prompt": DEFAULT_SYSTEM_PROMPT,
     "api_default_rpm": 20,
     "api_default_daily_tokens": 50000,
     "api_max_keys_per_user": 5,
@@ -87,8 +91,11 @@ class SettingsStore:
                 if isinstance(v, bool) or not isinstance(v, int) or v < 0 or v > 10**9:
                     raise ValueError(f"{k} must be a non-negative integer")
             if t is str:
-                if not isinstance(v, str) or len(v) > 500:
-                    raise ValueError(f"{k} must be a string up to 500 chars")
+                limit = 8000 if k == "system_prompt" else 500
+                if not isinstance(v, str) or len(v) > limit:
+                    raise ValueError(f"{k} must be a string up to {limit} chars")
+                if k == "system_prompt" and not v.strip():
+                    v = DEFAULT_SYSTEM_PROMPT   # empty = back to the default
             clean[k] = v
         with self._sf() as s:
             for k, v in clean.items():
