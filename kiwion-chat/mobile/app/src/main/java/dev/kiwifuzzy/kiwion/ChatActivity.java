@@ -248,6 +248,9 @@ public class ChatActivity extends BaseActivity {
         if (messages.isEmpty()) list.removeAllViews();
         final View pendingUser;
         if (optimisticText != null) {
+            // clear the field right away; if nothing reaches the server the text is put back below
+            input.setText("");
+            app.prefs.draft(chatId, null);
             pendingUser = bubble(AuthActivity.json("role", "user", "content", optimisticText), false);
             list.addView(pendingUser);
         } else pendingUser = null;
@@ -293,10 +296,6 @@ public class ChatActivity extends BaseActivity {
                             app.main.post(new Runnable() {
                                 public void run() {
                                     if ("meta".equals(type)) {
-                                        if (optimisticText != null && input.getText().toString().trim().equals(optimisticText)) {
-                                            input.setText("");
-                                            app.prefs.draft(chatId, null);
-                                        }
                                         JSONObject chat = ev.optJSONObject("chat");
                                         if (chat != null) titleView.setText(chat.optString("title"));
                                     } else if ("queued".equals(type)) {

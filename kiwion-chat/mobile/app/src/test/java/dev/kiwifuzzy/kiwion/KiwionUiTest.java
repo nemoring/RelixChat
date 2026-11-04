@@ -218,6 +218,7 @@ public class KiwionUiTest {
         input.setText("Привет из Android!");
         final Button send = (Button) byDescription(c, "Отправить");
         send.performClick();
+        assertEquals("input is cleared immediately on send", "", input.getText().toString());
         waitFor(new Cond() { public boolean ok() { return "Остановить".contentEquals(send.getContentDescription()); } }, 5000);
         waitFor(new Cond() { public boolean ok() { return "Отправить".contentEquals(send.getContentDescription())
                 && containing(c, "Kiwion (mock) получил") != null; } }, 30000);

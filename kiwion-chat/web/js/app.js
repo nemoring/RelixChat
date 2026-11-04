@@ -530,9 +530,15 @@ async function send() {
   const text = input.value.trim();
   if (!text || S.streaming) return;
   if (!navigator.onLine) return toast("Нет подключения к интернету. Сообщение сохранено в поле ввода.", "warn", "📡");
+  // clear the field right away; if the message does not reach the server the text is restored
+  input.value = ""; autosize(input);
   let id;
-  try { id = await ensureChat(); } catch (e) { return toast(errMsg(e), "bad"); }
+  try { id = await ensureChat(); } catch (e) {
+    if (!input.value.trim()) { input.value = text; autosize(input); }
+    return toast(errMsg(e), "bad");
+  }
   const oldDraft = "kiwion.draft.new";
+  [oldDraft, "kiwion.draft." + id].forEach((k) => store.set(k, null));
   generate(`/api/chats/${id}/messages`, "POST", { content: text }, { text, clearInput: true, draftKeys: [oldDraft, "kiwion.draft." + id] });
 }
 

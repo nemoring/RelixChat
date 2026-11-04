@@ -108,6 +108,7 @@ def test_main_user_journey(server):
         # streaming answer with markdown + code highlighting
         page.fill("#input", "Привет, киви!")
         page.keyboard.press("Enter")
+        assert page.input_value("#input") == ""          # cleared immediately on send
         page.wait_for_selector(".msg.user >> text=Привет, киви!")
         page.wait_for_selector(".msg.assistant pre code.hljs", timeout=15000)
         page.wait_for_selector("#send[aria-label='Отправить']", timeout=15000)
