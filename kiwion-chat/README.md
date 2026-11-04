@@ -112,6 +112,7 @@ Android-приложении (Canvas + аниматоры, звук синтез
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура и потоки данных
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — VPS + домашний узел, HTTPS, WireGuard/mTLS, SMTP, бэкапы
+- [docs/MODELS.md](docs/MODELS.md) — смена модели (Gemma 3, Qwen3 и др.), что подходит под ваш сервер
 - [docs/WEAK_HARDWARE.md](docs/WEAK_HARDWARE.md) — Pentium 4417U / 8 ГБ / Intel HD 620
 - [docs/SECURITY.md](docs/SECURITY.md) — модель безопасности
 - [docs/TESTING.md](docs/TESTING.md) — тесты и что было проверено

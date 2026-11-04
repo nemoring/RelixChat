@@ -150,7 +150,11 @@ class LlamaCppEngine(BaseEngine):
         while time.monotonic() < deadline:
             if self.proc and self.proc.poll() is not None:
                 self.state = "error"
-                self.error = f"llama-server exited with code {self.proc.returncode} (see ~/.kiwion/logs/llama-server.log)"
+                code = self.proc.returncode
+                self.error = f"llama-server exited with code {code} (see llama-server.log)"
+                if code in (-4, 132):   # SIGILL: binary built for another CPU (e.g. the VPS moved to another host)
+                    self.error += (". Illegal CPU instruction: llama.cpp was built for a different processor — "
+                                   "re-run install.sh (it rebuilds a portable llama.cpp)")
                 log.error(self.error)
                 return
             try:

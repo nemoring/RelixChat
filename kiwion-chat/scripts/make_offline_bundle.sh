@@ -12,6 +12,8 @@ mkdir -p "$B/kiwion-chat" "$B/wheels/runtime" "$B/models" "$OUT"
 (cd "$ROOT" && git ls-files -z | grep -zv '^mobile/' | xargs -0 -I{} cp --parents {} "$B/kiwion-chat/")
 rsync -a --exclude .git --exclude build --exclude 'models/*.gguf' "$LLAMA/" "$B/llama.cpp/"
 cp "$ROOT/deploy/install_offline.sh" "$B/install.sh"
+mkdir -p "$B/selftest"   # tiny random-weight GGUF: checks that the llama.cpp build runs on the server's CPU
+python3 "$ROOT/scripts/make_tiny_test_model.py" "$B/selftest/kiwion-selftest.gguf" >/dev/null
 PLAT=(--only-binary=:all: --platform manylinux_2_28_x86_64 --platform manylinux2014_x86_64 --platform manylinux_2_17_x86_64 --python-version 3.12 --implementation cp)
 pip download -q -d "$B/wheels/runtime" "${PLAT[@]}" fastapi "uvicorn[standard]" sqlalchemy argon2-cffi cryptography pydantic email-validator httpx
 tar czf "$OUT/kiwion-offline.tar.gz" -C "$WORK" kiwion-offline

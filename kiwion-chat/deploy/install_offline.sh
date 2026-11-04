@@ -64,15 +64,39 @@ fi
 grep -q '^KIWION_LOG_DIR=' "$ENV" || echo "KIWION_LOG_DIR=$APP/data/logs" >> "$ENV"
 
 if [ "$WITH_MODEL" = "1" ]; then
-  say "building llama.cpp for this CPU (5-20 min)"
-  if [ ! -x "$APP/third_party/llama.cpp/build/bin/llama-server" ]; then
+  # Portable build: code for every x86 CPU generation, the right variant is picked at start-up.
+  # A VPS can be migrated to a host with a different CPU; a "native" build would then crash
+  # with "illegal instruction". The self-test below catches that and rebuilds.
+  LBIN="$APP/third_party/llama.cpp/build/bin"
+  SELFTEST="$SRC/selftest/kiwion-selftest.gguf"
+  NEED_BUILD=1
+  if [ -x "$LBIN/llama-server" ] && [ -f "$APP/third_party/llama.cpp/build/.kiwion-portable" ]; then
+    if [ ! -f "$SELFTEST" ] || "$LBIN/llama-bench" -m "$SELFTEST" -p 8 -n 4 -r 1 >/dev/null 2>&1; then
+      NEED_BUILD=0
+    else
+      echo "existing llama.cpp build does not run on this CPU — rebuilding"
+    fi
+  fi
+  if [ "$NEED_BUILD" = "1" ]; then
+    say "building llama.cpp (portable, all CPU variants; 15-30 min on 2 vCPU)"
     if ! swapon --show | grep -q .; then
       fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
       grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
     fi
-    (cd "$APP/third_party/llama.cpp" && cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF \
-       -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF >/dev/null \
-     && cmake --build build -j "$(nproc)" --target llama-server llama-quantize llama-bench)
+    rm -rf "$APP/third_party/llama.cpp/build"
+    (cd "$APP/third_party/llama.cpp" \
+     && cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON \
+          -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+          -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF >/dev/null \
+     && cmake --build build -j "$(nproc)" --target llama-server llama-quantize llama-bench \
+          $(cmake --build build --target help | grep -oE 'ggml-cpu-[a-z0-9_]+' | sort -u))
+    touch "$APP/third_party/llama.cpp/build/.kiwion-portable"
+    if [ -f "$SELFTEST" ]; then
+      "$LBIN/llama-bench" -m "$SELFTEST" -p 8 -n 4 -r 1 >/dev/null 2>&1 \
+        && echo "llama.cpp self-test: OK" || { echo "!!! llama.cpp self-test failed"; exit 1; }
+    fi
+  else
+    echo "llama.cpp: existing portable build passes the self-test"
   fi
 
   say "model weights"
@@ -90,7 +114,16 @@ if [ "$WITH_MODEL" = "1" ]; then
       mv "$APP/models/download.bin" "$APP/models/olmo-2-1b-instruct-Q4_K_M.gguf"
     fi
   fi
-  GGUF="$(ls -S "$APP"/models/*.gguf 2>/dev/null | grep -v tiny | head -1 || true)"
+  # model choice: a .gguf shipped next to install.sh (a new model) wins; otherwise keep the current one
+  NEW="$(ls -S "$SRC"/models/*.gguf 2>/dev/null | grep -v tiny | head -1 || true)"
+  CUR="$(sed -n 's/^KIWION_MODEL_PATH=//p' "$ENV")"
+  if [ -n "$NEW" ]; then
+    GGUF="$APP/models/$(basename "$NEW")"
+  elif [ -n "$CUR" ] && [ -f "$CUR" ]; then
+    GGUF="$CUR"
+  else
+    GGUF="$(ls -S "$APP"/models/*.gguf 2>/dev/null | grep -v tiny | head -1 || true)"
+  fi
   if [ -z "$GGUF" ]; then
     HF="$APP/models/hf/OLMo-2-0425-1B-Instruct"
     [ -f "$HF/config.json" ] || HF="$(dirname "$(find "$APP/models/hf" -name config.json | head -1)" 2>/dev/null || true)"

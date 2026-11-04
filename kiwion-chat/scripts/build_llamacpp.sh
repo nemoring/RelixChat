@@ -20,13 +20,19 @@ cd "$DIR"
 git fetch --depth 1 origin "$REF" 2>/dev/null || git fetch origin
 git checkout -q "$REF" 2>/dev/null || echo "warning: could not checkout $REF, building current checkout"
 
+if [ "${KIWION_PORTABLE:-0}" = "1" ]; then   # all CPU variants, chosen at runtime (recommended on a VPS)
+  FLAGS=(-DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DBUILD_SHARED_LIBS=ON
+         -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF)
+else
 FLAGS=(-DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF)
+fi
 if [ "${KIWION_VULKAN:-0}" = "1" ]; then
   FLAGS+=(-DGGML_VULKAN=ON)   # needs libvulkan-dev + glslc (Ubuntu: sudo apt install libvulkan-dev glslc mesa-vulkan-drivers)
 fi
 cmake -B build "${FLAGS[@]}"
 # low-RAM machines: limit parallel compile jobs (each job can take ~1 GB)
-cmake --build build -j "$JOBS" --target llama-server llama-quantize llama-bench llama-cli
+cmake --build build -j "$JOBS" --target llama-server llama-quantize llama-bench llama-cli \
+  $(cmake --build build --target help | grep -oE 'ggml-cpu-[a-z0-9_]+' | sort -u)
 echo
 echo "built: $DIR/build/bin/llama-server"
 grep -o -m1 -E '\b(avx2|avx|sse4_2)\b' /proc/cpuinfo | head -1 | sed 's/^/best SIMD on this CPU: /' || true
